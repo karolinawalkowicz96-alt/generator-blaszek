@@ -32,6 +32,7 @@ Skróty przy wklejaniu tekstu
 80x25 3szt           – trzy takie same blaszki
 *MISTRZ              – linia pogrubiona
 _Gołębie młode       – linia pochyła
+{#c00000}MISTRZ     – kolor tekstu (kod koloru w klamrach)
 @Hażlach, 25.10.2026 – napis na dole blaszki (pochyły, trochę mniejszy)
 Blaszki oddziela się pustą linią.
 
