@@ -1,0 +1,46 @@
+GENERATOR BLASZEK – pliki strony
+=================================
+
+Co jest w paczce
+----------------
+index.html  – cała strona w jednym pliku (razem z czcionką Montserrat).
+
+Jak używać na swoim komputerze
+------------------------------
+1. Rozpakuj paczkę.
+2. Kliknij dwa razy plik index.html – otworzy się w przeglądarce
+   (najlepiej Chrome, Safari albo Edge).
+3. Wpisz blaszki i kliknij „Pobierz PDF”. Plik trafi do folderu Pobrane.
+
+Potrzebny jest internet: strona pobiera przy starcie mały program do
+tworzenia PDF (jsPDF) i czcionkę interfejsu.
+
+Jak wrzucić na własną stronę www
+--------------------------------
+Wgraj plik index.html na dowolny hosting (np. przez FTP do katalogu,
+w którym ma być generator). Nie trzeba bazy danych ani PHP.
+Przykład: https://twojastrona.pl/blaszki/index.html
+
+Zapisane blaszki
+----------------
+Wpisane blaszki zapisują się w przeglądarce na tym komputerze.
+Inny komputer lub inna przeglądarka zaczyna od pustej listy.
+
+Skróty przy wklejaniu tekstu
+----------------------------
+80x25 albo 8 / 2,5   – wymiar (mm albo cm), pierwsza linia blaszki
+80x25 3szt           – trzy takie same blaszki
+*MISTRZ              – linia pogrubiona
+_Gołębie młode       – linia pochyła
+@Hażlach, 25.10.2026 – napis na dole blaszki (pochyły, trochę mniejszy)
+Blaszki oddziela się pustą linią.
+
+Czcionka Montserrat: licencja SIL Open Font License 1.1
+(wolno ją osadzać w plikach i na stronach).
+
+Układ do gilotyny
+-----------------
+Blaszki są zawsze ułożone tak, żeby dało się je wyciąć gilotyną:
+najpierw tniesz kartkę w poprzek na pasy (każde cięcie przez całą
+szerokość), potem każdy pas na blaszki. Żadne cięcie nie przechodzi
+przez inną blaszkę.
