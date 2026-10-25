@@ -1,47 +1,23 @@
-GENERATOR BLASZEK – pliki strony
-=================================
+GENERATOR BLASZEK by Dawid Tokarski
 
-Co jest w paczce
-----------------
-index.html  – cała strona w jednym pliku (razem z czcionką Montserrat).
+Otwórz index.html w przeglądarce lub zastąp nim plik na hostingu.
+Strona działa bez instalacji. Biblioteka PDF i czcionki są osadzone lokalnie.
 
-Jak używać na swoim komputerze
-------------------------------
-1. Rozpakuj paczkę.
-2. Kliknij dwa razy plik index.html – otworzy się w przeglądarce
-   (najlepiej Chrome, Safari albo Edge).
-3. Wpisz blaszki i kliknij „Pobierz PDF”. Plik trafi do folderu Pobrane.
+Przy każdej linii:
+- Rozmiar (pt): puste pole oznacza Auto. Wpisz od 4,5 do 200 pt, aby
+  ustawić własny rozmiar. Przycisk Auto przywraca dopasowanie.
+- Czcionka: Montserrat lub Times — Liberation Serif (odpowiednik Times New Roman).
+- Dotychczasowe pogrubienie, kursywa i kolor działają także z nową czcionką.
 
-Potrzebny jest internet: strona pobiera przy starcie mały program do
-tworzenia PDF (jsPDF) i czcionkę interfejsu.
+Rozmiar ręczny pozostaje stały po zmianie wymiarów blaszki. Pozostałe linie
+nadal dopasowują się automatycznie. Zbyt duży tekst wywołuje ostrzeżenie.
+Podgląd i PDF korzystają z tych samych czcionek i rozmiarów.
+Ustawienia zachowują się przy zapisie i duplikowaniu. W trybie tekstowym
+formatowanie zapisują znaczniki {pt:28} oraz {font:serif} przed treścią linii.
 
-Jak wrzucić na własną stronę www
---------------------------------
-Wgraj plik index.html na dowolny hosting (np. przez FTP do katalogu,
-w którym ma być generator). Nie trzeba bazy danych ani PHP.
-Przykład: https://twojastrona.pl/blaszki/index.html
+Nagłówek: Generator Blaszek, z subtelnym podpisem by Dawid Tokarski.
 
-Zapisane blaszki
-----------------
-Wpisane blaszki zapisują się w przeglądarce na tym komputerze.
-Inny komputer lub inna przeglądarka zaczyna od pustej listy.
-
-Skróty przy wklejaniu tekstu
-----------------------------
-80x25 albo 8 / 2,5   – wymiar (mm albo cm), pierwsza linia blaszki
-80x25 3szt           – trzy takie same blaszki
-*MISTRZ              – linia pogrubiona
-_Gołębie młode       – linia pochyła
-{#c00000}MISTRZ     – kolor tekstu (kod koloru w klamrach)
-@Hażlach, 25.10.2026 – napis na dole blaszki (pochyły, trochę mniejszy)
-Blaszki oddziela się pustą linią.
-
-Czcionka Montserrat: licencja SIL Open Font License 1.1
-(wolno ją osadzać w plikach i na stronach).
-
-Układ do gilotyny
------------------
-Blaszki są zawsze ułożone tak, żeby dało się je wyciąć gilotyną:
-najpierw tniesz kartkę w poprzek na pasy (każde cięcie przez całą
-szerokość), potem każdy pas na blaszki. Żadne cięcie nie przechodzi
-przez inną blaszkę.
+Weryfikacja: automatyczny i ręczny rozmiar, mieszany układ linii,
+przekroczenie wymiarów, duplikowanie, format tekstowy i generowanie PDF
+z polskimi znakami. Nie przeprowadzono wizualnego testu w przeglądarce
+w tym środowisku (brak dostępnego Chromium).
