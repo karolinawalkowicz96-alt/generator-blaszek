@@ -119,19 +119,6 @@ details.adv summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44p
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 14px 12px 20px;display:flex;gap:14px;align-items:center;font-size:18px;box-shadow:0 8px 30px var(--shadow);z-index:20;max-width:calc(100% - 32px)}
 .toast .btn{min-height:44px;background:var(--bg);color:var(--ink);border-color:var(--bg)}
 @media (prefers-reduced-motion:no-preference){.plate{transition:border-color .2s,box-shadow .2s}}
-.photo{border:2px dashed var(--accent);border-radius:12px;padding:16px;margin-bottom:20px;background:var(--accent-soft);display:flex;flex-direction:column;gap:12px}
-.photo h3{margin:0;font-size:21px}
-.photo p{margin:0;font-size:17px}
-.photo .row .btn{flex:1 1 220px;min-height:60px;font-size:20px}
-.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.thumbs{display:flex;flex-wrap:wrap;gap:8px}
-.thumbs img{width:96px;height:96px;object-fit:cover;border-radius:8px;border:2px solid var(--line)}
-.ocr-result{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px}
-.ocr-list{margin:0;padding-left:24px;max-height:320px;overflow:auto;font-size:16px}
-.ocr-list li{margin-bottom:8px}
-.ocr-list .sz{font-weight:700;color:var(--accent)}
-.spin{display:inline-block;width:20px;height:20px;border:3px solid var(--line);border-top-color:var(--accent);border-radius:50%;vertical-align:-4px;margin-right:8px}
-@media (prefers-reduced-motion:no-preference){.spin{animation:sp 1s linear infinite}@keyframes sp{to{transform:rotate(360deg)}}}
 </style>
 
 <div class="top">
@@ -145,17 +132,6 @@ details.adv summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44p
     <div class="step-h"><div class="num" aria-hidden="true">1</div><div><h2 id="h1s">Wpisz treść blaszek</h2><p>Każda blaszka ma swoje okienko. Wymiar podaj w milimetrach.</p></div></div>
 
 
-    <div class="photo" id="photo">
-      <h3>Nie chcesz przepisywać? Zrób zdjęcie kartki</h3>
-      <p>Napisz tekst blaszek na kartce (może być odręcznie) albo weź gotowy wydruk lub zrzut ekranu. Program sam przepisze tekst i wymiary. Przed dodaniem wszystko sprawdzisz.</p>
-      <div class="row">
-        <button class="btn primary" id="btn-cam" type="button">Zrób zdjęcie aparatem</button>
-        <button class="btn" id="btn-gal" type="button">Wybierz zdjęcie z galerii</button>
-      </div>
-      <input class="vh" type="file" id="in-cam" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">
-      <input class="vh" type="file" id="in-gal" accept="image/*" multiple tabindex="-1" aria-hidden="true">
-      <div id="ocr"></div>
-    </div>
     <div class="tabs" role="tablist">
       <button class="tab" role="tab" id="tab-form" aria-selected="true" aria-controls="panel-form" type="button">Wpisuję po kolei</button>
       <button class="tab" role="tab" id="tab-paste" aria-selected="false" aria-controls="panel-paste" type="button">Wklejam gotowy tekst</button>
@@ -174,7 +150,7 @@ details.adv summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44p
       <div class="hint">
         <b>Jak wkleić tekst:</b>
         <ul>
-          <li>Blaszki oddziel <b>pustą linią</b>.</li>
+          <li>Każda blaszka zaczyna się od wymiaru albo pustej linii.</li>
           <li>Pierwsza linia to wymiar, np. <code>80x25</code> (mm) albo <code>8 / 2,5</code> (cm).</li>
           <li>Gwiazdka na początku linii to pogrubienie: <code>*MISTRZ</code></li>
           <li>Podkreślnik to pochyłe litery: <code>_Gołębie młode</code></li>
@@ -253,8 +229,20 @@ function parseSize(s){
   return {w:+(num(m[1])*k).toFixed(2),h:+(num(m[3])*k).toFixed(2),copies:copies?parseInt(copies):1,pt:pt?num(pt):null};
 }
 function fromText(text){
-  const blocks=text.replace(/\r/g,'').split(/\n\s*\n/).map(b=>b.split('\n').filter(l=>l.trim()!=='')).filter(b=>b.length);
+  // Bloki: pusta linia albo nowa linia z wymiarem zaczyna kolejną blaszkę (tekst skopiowany ze zdjęcia często nie ma pustych linii)
+  const blocks=[];let cur=[];
+  for(const raw of text.replace(/\r/g,'').split('\n')){
+    if(!raw.trim()){if(cur.length){blocks.push(cur);cur=[]}continue}
+    if(parseSize(raw)&&cur.some(l=>!parseSize(l))){blocks.push(cur);cur=[]}
+    cur.push(raw);
+  }
+  if(cur.length) blocks.push(cur);
+  const autoBold=!/^\s*\*/m.test(text), autoFoot=!/^\s*@/m.test(text);
+  const isCaps=s=>{const L=s.replace(/[^A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]/g,'');return L.length>=3&&L===L.toUpperCase()&&!/\d/.test(s)&&!/^PZHGP\b/.test(s)};
+  const isPlaceDate=s=>/[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]{3,}.*\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\b/.test(s)||/^\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\b.*[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]{3,}/.test(s);
   return blocks.map(lines=>{
+    if(autoFoot&&lines.length>1&&isPlaceDate(lines[lines.length-1].trim())) lines=[...lines.slice(0,-1),'@'+lines[lines.length-1].trim()];
+    if(autoBold) lines=lines.map(l=>!parseSize(l)&&!/^\s*[_@]/.test(l)&&isCaps(l.trim())?'*'+l.trim():l);
     let size=parseSize(lines[0]);
     if(size) lines=lines.slice(1); else size={w:80,h:25,copies:1,pt:null};
     let footer='';const out=[];
@@ -394,7 +382,7 @@ function cardHtml(p){
     </div>
   </article>`;
 }
-function renderCards(){ $('cards').innerHTML=plates.length?plates.map(cardHtml).join(''):`<div class="hint">Nie ma jeszcze żadnej blaszki. Kliknij <b>„+ Dodaj nową blaszkę”</b> poniżej${$('photo')&&!$('photo').hidden?' albo zrób zdjęcie kartki':''}.</div>`; }
+function renderCards(){ $('cards').innerHTML=plates.length?plates.map(cardHtml).join(''):`<div class="hint">Nie ma jeszcze żadnej blaszki. Kliknij <b>„+ Dodaj nową blaszkę”</b> poniżej.</div>`; }
 const byId=id=>plates.find(p=>p.id===+id);
 
 $('cards').addEventListener('input',e=>{
@@ -561,121 +549,13 @@ $('dl').addEventListener('click',async()=>{
 });
 
 
-/* ---------- photo reading ---------- */
-let photoState='wait', sampler=null, imgLimits=null, ocrCtl=null, ocrFound=null;
-const OCR_PROMPT=`Na zdjęciach są projekty grawerowanych blaszek (tabliczek) na pucharach gołębiarskich, po polsku. Może to być wydruk, zrzut ekranu albo kartka pisana odręcznie (długopisem, krzywo, z poprawkami). Pismo odręczne czytaj starannie, z kontekstu gołębiarskiego (np. konk., pkt., PZHGP, Oddział, Sekcja, V-CE MISTRZ, PRZODOWNIK, numery obrączek PL - 0123 - 24 - 1234). Przekreślony tekst pomiń. Na kartce odręcznej tekst pisany WIELKIMI literami lub podkreślony traktuj jako pogrubiony.
-Odczytaj KAŻDĄ blaszkę i odpowiedz wyłącznie JSON-em w tej postaci:
-{"plates":[{"w":80,"h":25,"lines":[{"text":"PZHGP Sekcja Hażlach II 2026","bold":false,"italic":false},{"text":"MISTRZ","bold":true,"italic":false}],"footer":"Hażlach, 25.10.2026"}]}
-
-Zasady:
-- Wymiar blaszki stoi zwykle nad jej tekstem, np. "8 / 2,5" lub "8x2,5". Gdy liczby są małe (poniżej 20), to centymetry: zamień na milimetry (8 / 2,5 → w=80, h=25). Pierwsza liczba to szerokość, druga wysokość. Gdy wymiaru nie ma, wpisz w=null i h=null.
-- Linia z wymiarem NIE jest tekstem blaszki.
-- Gdy wspólna linia nagłówka (np. "PZHGP Sekcja ... 2026") stoi tylko nad pierwszą blaszką w rzędzie, a obok są blaszki bez niej, dopisz ją na początku każdej blaszki z tego rzędu.
-- Przepisuj tekst dokładnie: polskie znaki, wielkość liter, myślniki, przecinki w liczbach, kropki po "konk." i "pkt.". Nie poprawiaj i nie dopisuj niczego od siebie.
-- bold=true dla linii pogrubionych na zdjęciu, italic=true dla linii pochyłych.
-- Gdy ostatnia linia blaszki to miejscowość i/lub data (np. "Hażlach, 25.10.2026"), wpisz ją do "footer", a nie do "lines". Gdy jej nie ma, footer="".
-- Kolejność: wierszami od góry, w wierszu od lewej do prawej.`;
-
-function initPhoto(){
-  let tries=0;
-  (function hook(){
-    if(window.claude&&window.claude.use){
-      window.claude.use('sample').then(async s=>{
-        if(!s){photoState='off';return}
-        const lim=await s.limits().catch(()=>null);
-        if(!lim||!lim.images){photoState='off';return}
-        sampler=s; imgLimits=lim.images;
-        const acc=(imgLimits.mediaTypes&&imgLimits.mediaTypes.length)?imgLimits.mediaTypes.join(','):'image/*';
-        $('in-gal').accept=acc+',image/*'; $('in-cam').accept='image/*';
-        photoState='ready';
-      }).catch(()=>{});
-      return;
-    }
-    if(++tries<50) setTimeout(hook,200); else photoState='off';
-  })();
-  const go=id=>{
-    if(photoState==='ready') return $(id).click();
-    if(photoState==='wait') return ocrBox(`<p class="msg info" style="margin:0">Chwileczkę, przygotowuję czytanie zdjęć. Spróbuj za kilka sekund.</p>`);
-    ocrBox(`<p class="msg err" style="margin:0">Czytanie zdjęć działa tylko w Claude (w przeglądarce na claude.ai albo w aplikacji Claude na telefonie). Otwórz generator tam i spróbuj jeszcze raz.</p>`);
-  };
-  $('btn-cam').onclick=()=>go('in-cam');
-  $('btn-gal').onclick=()=>go('in-gal');
-  $('in-cam').onchange=e=>{readPhotos([...e.target.files]);e.target.value=''};
-  $('in-gal').onchange=e=>{readPhotos([...e.target.files]);e.target.value=''};
-}
-
-async function shrink(file){
-  const okType=!imgLimits.mediaTypes||imgLimits.mediaTypes.includes(file.type);
-  if(okType&&file.size<=imgLimits.maxInputBytes&&file.size<=6e6) return file;
-  try{
-    const bmp=await createImageBitmap(file);
-    const k=Math.min(1,2400/Math.max(bmp.width,bmp.height));
-    const c=document.createElement('canvas'); c.width=Math.round(bmp.width*k); c.height=Math.round(bmp.height*k);
-    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-    return await new Promise((res,rej)=>c.toBlob(b=>b?res(b):rej(),'image/jpeg',0.88));
-  }catch(e){return file}
-}
-
-function ocrBox(html){$('ocr').innerHTML=html}
-async function readPhotos(files){
-  if(!files.length||!sampler) return;
-  files=files.slice(0,imgLimits.maxCount||1);
-  const urls=files.map(f=>URL.createObjectURL(f));
-  const thumbs=`<div class="thumbs">${urls.map(u=>`<img src="${u}" alt="Wybrane zdjęcie">`).join('')}</div>`;
-  ocrBox(`<div class="ocr-result">${thumbs}<p class="msg info" style="margin:0"><span class="spin" aria-hidden="true"></span>Czytam zdjęcie… To może potrwać do 2 minut. Nie zamykaj strony.</p><div class="row"><button class="btn" id="ocr-stop" type="button">Przerwij</button></div></div>`);
-  ocrCtl=new AbortController();
-  $('ocr-stop').onclick=()=>ocrCtl.abort();
-  try{
-    const imgs=await Promise.all(files.map(shrink));
-    const res=await sampler.json(OCR_PROMPT,{images:imgs,signal:ocrCtl.signal,modelTier:'complex'});
-    const list=(res&&Array.isArray(res.plates)?res.plates:Array.isArray(res)?res:[]).map(p=>{
-      const lines=(Array.isArray(p.lines)?p.lines:[]).map(l=>typeof l==='string'?{text:l,bold:false}:{text:String(l.text||'').trim(),bold:!!l.bold,italic:!!l.italic}).filter(l=>l.text);
-      const w=num(p.w,0),h=num(p.h,0);
-      return {w:w>0?w:80,h:h>0?h:25,guess:!(w>0&&h>0),lines,footer:typeof p.footer==='string'?p.footer.trim():''};
-    }).filter(p=>p.lines.length);
-    if(!list.length){ocrBox(`<div class="ocr-result">${thumbs}<p class="msg err" style="margin:0">Nie znalazłem tekstu blaszek na tym zdjęciu. Zrób zdjęcie bliżej i przy dobrym świetle.</p></div>`);return}
-    ocrFound=list;
-    const items=list.map(p=>`<li><span class="sz">${fmt(p.w)} × ${fmt(p.h)} mm${p.guess?' (wymiar do sprawdzenia)':''}</span><br>${p.lines.map(l=>{let s=esc(l.text);if(l.italic)s=`<i>${s}</i>`;return l.bold?`<b>${s}</b>`:s}).join('<br>')}${p.footer?`<br><i>${esc(p.footer)}</i>`:''}</li>`).join('');
-    ocrBox(`<div class="ocr-result">
-      <p class="msg ok" style="margin:0">Odczytałem ${list.length} ${plural(list.length,'blaszkę','blaszki','blaszek')}. Przeczytaj i sprawdź, czy wszystko się zgadza.</p>
-      <ol class="ocr-list">${items}</ol>
-      <div class="row">
-        <button class="btn primary" id="ocr-add" type="button">Dodaj do moich blaszek</button>
-        <button class="btn" id="ocr-replace" type="button">Zastąp wszystkie blaszki</button>
-        <button class="btn danger" id="ocr-cancel" type="button">Anuluj</button>
-      </div></div>`);
-    $('ocr-add').onclick=()=>applyOcr(false);
-    $('ocr-replace').onclick=()=>applyOcr(true);
-    $('ocr-cancel').onclick=()=>{ocrFound=null;ocrBox('')};
-  }catch(e){
-    const c=e&&e.code;
-    const m=c==='cancelled'?'Przerwano czytanie zdjęcia.':
-      c==='not_granted'?'Bez zgody na użycie Claude nie da się czytać zdjęć. Możesz wpisać blaszki ręcznie.':
-      c==='image_rejected'?'Tego zdjęcia nie da się odczytać. Spróbuj zdjęcia w formacie JPG.':
-      c==='rate_limited'?'Za dużo prób naraz. Odczekaj chwilę i spróbuj ponownie.':
-      c==='invalid_json'||c==='empty_completion'?'Nie udało się odczytać tekstu. Spróbuj wyraźniejszego zdjęcia.':
-      'Nie udało się odczytać zdjęcia. Spróbuj jeszcze raz.';
-    ocrBox(`<div class="ocr-result">${thumbs}<p class="msg err" style="margin:0">${m}</p></div>`);
-  }finally{ocrCtl=null}
-}
-function applyOcr(replace){
-  if(!ocrFound) return;
-  const old=plates.slice();
-  const add=ocrFound.map(p=>mk(p));
-  plates=replace?add:plates.concat(add);
-  ocrFound=null; ocrBox('');
-  showTab('form'); changed();
-  if(add[0]) flash(add[0],true);
-  toast(replace?`Wczytano ${add.length} ${plural(add.length,'blaszkę','blaszki','blaszek')} ze zdjęcia.`:`Dodano ${add.length} ${plural(add.length,'blaszkę','blaszki','blaszek')} ze zdjęcia.`,()=>{plates=old;renderCards();changed()});
-}
-
 /* ---------- start ---------- */
 function init(){
   if(!window.jspdf){say('err','Nie wczytał się program do PDF. Odśwież stronę.');return}
   measurer=newDoc();
   const saved=restore();
   plates=(saved||[]).map(mk);
-  renderCards(); build(); initPhoto();
+  renderCards(); build();
   try{
     const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0)).buffer;
     const faces=[new FontFace('MontserratEmb',b64(FONT_REG),{weight:'400'}),new FontFace('MontserratEmb',b64(FONT_BOLD),{weight:'700'})];
