@@ -72,7 +72,14 @@ h1{font-size:34px;line-height:1.15;margin:0 0 6px;text-wrap:balance}
 .line input{flex:1 1 260px;min-height:52px;padding:8px 12px;border:2px solid var(--line);border-radius:8px;background:var(--field);font-size:19px;min-width:0;width:auto}
 .line input.b{font-weight:700}
 .line input.i{font-style:italic}
-.tg{display:flex;gap:8px;flex-wrap:wrap}
+.tg{display:flex;gap:6px;flex-wrap:nowrap}
+.btn.ic{width:52px;padding:0;font-size:22px}
+.bi{font-family:Georgia,"Times New Roman",serif;font-weight:700}
+.ii{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700}
+.ai{font-family:Georgia,"Times New Roman",serif;font-weight:700;display:flex;flex-direction:column;align-items:center;line-height:1;gap:3px}
+.ai .bar{display:block;width:22px;height:5px;border-radius:2px;outline:1px solid var(--line)}
+.leg{display:inline-flex;gap:6px;align-items:baseline;margin-left:8px;font-weight:400}
+.leg .bi,.leg .ii{font-size:16px;color:var(--ink);margin-left:6px}
 .colbtn .swatch{display:inline-block;width:18px;height:18px;border-radius:50%;border:2px solid var(--line);flex:none}
 .footrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .footrow input{flex:1 1 220px;min-width:0;min-height:52px;padding:8px 12px;border:2px solid var(--line);border-radius:8px;background:var(--field);font-size:19px;font-style:italic}
@@ -124,7 +131,7 @@ details.adv{margin-top:18px;border-top:2px solid var(--line);padding-top:14px}
 details.adv summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44px;display:flex;align-items:center}
 .advgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 14px;margin-top:10px}
 .advgrid .f input,.advgrid .f select{font-size:18px}
-@media (max-width:520px){.advgrid{grid-template-columns:minmax(0,1fr)}.line{gap:6px}.line .tg{flex-wrap:nowrap;gap:6px}.line .btn.boldt{padding:7px 8px;font-size:14px;min-height:46px;gap:6px}.line .tick{display:none}.line .btn.x{width:40px;min-height:46px;font-size:20px}.colbtn .swatch{width:14px;height:14px}}
+@media (max-width:520px){.advgrid{grid-template-columns:minmax(0,1fr)}.line{gap:6px}.line .tg{flex-wrap:nowrap;gap:6px}.line .btn.ic,.line .btn.x{width:46px;min-height:46px}}
 .confirm{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--warn-bg);border-radius:10px;padding:12px 14px;margin-top:12px}
 .confirm span{font-weight:700;color:var(--warn);flex:1 1 220px}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);border-radius:12px;padding:12px 14px 12px 20px;display:flex;gap:14px;align-items:center;font-size:18px;box-shadow:0 8px 30px var(--shadow);z-index:20;max-width:calc(100% - 32px)}
@@ -225,7 +232,7 @@ const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',
 /* ---------- state ---------- */
 let uid=1;
 const okCol=c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c)?c.toLowerCase():null;
-const mk=p=>({id:uid++,w:p.w,h:p.h,copies:p.copies||1,pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color)}))});
+const mk=p=>({id:uid++,w:p.w,h:p.h,copies:p.copies||1,pt:p.pt||null,footer:p.footer||'',footerColor:null,lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color)}))});
 let plates=[];
 const KEY='blaszki-state-v3';
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(plates.map(({id,...r})=>r)))}catch(e){}}
@@ -270,7 +277,7 @@ function fromText(text){
   });
 }
 function toText(){
-  return plates.map(p=>[`${p.w}x${p.h}`+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),...p.lines.map(l=>(l.bold?'*':'')+(l.italic?'_':'')+(l.color&&l.color!=='#000000'?`{${l.color}}`:'')+l.text),...(p.footer?['@'+(p.footerColor&&p.footerColor!=='#000000'?`{${p.footerColor}}`:'')+p.footer]:[])].join('\n')).join('\n\n');
+  return plates.map(p=>[`${p.w}x${p.h}`+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),...p.lines.map(l=>(l.bold?'*':'')+(l.italic?'_':'')+(l.color&&l.color!=='#000000'?`{${l.color}}`:'')+l.text),...(p.footer?['@'+p.footer]:[])].join('\n')).join('\n\n');
 }
 
 /* ---------- pdf / metrics ---------- */
@@ -358,12 +365,12 @@ function pack(items,o){
 }
 
 /* ---------- step 1: cards ---------- */
-const colorBtn=c=>`<button type="button" class="btn boldt colbtn" data-act="color" title="Kolor liter"><span class="swatch" style="background:${c||'#000000'}"></span>Kolor</button>`;
+const colorBtn=c=>`<button type="button" class="btn boldt ic colbtn" data-act="color" aria-label="Kolor liter" title="Kolor liter"><span class="ai">A<span class="bar" style="background:${c||'#000000'}"></span></span></button>`;
 function lineRow(p,li){
   const l=p.lines[li];
   return `<div class="line" data-li="${li}">
     <input type="text" id="t-${p.id}-${li}" class="${l.bold?'b':''}${l.italic?' i':''}" value="${esc(l.text)}" aria-label="Blaszka ${idxOf(p)}, linia ${li+1}" data-act="text"${l.color?` style="color:${l.color}"`:''}>
-    <div class="tg"><button type="button" class="btn boldt" data-act="bold" aria-pressed="${l.bold}" title="Pogrubienie">Gruba<span class="tick">${l.bold?' ✓':''}</span></button><button type="button" class="btn boldt it" data-act="italic" aria-pressed="${l.italic}" title="Pochyłe litery">Pochyła<span class="tick">${l.italic?' ✓':''}</span></button>${colorBtn(l.color)}<button type="button" class="btn x" data-act="del-line" aria-label="Usuń linię ${li+1}" title="Usuń linię">×</button></div>
+    <div class="tg"><button type="button" class="btn boldt ic" data-act="bold" aria-pressed="${l.bold}" aria-label="Gruba" title="Gruba (pogrubienie)"><span class="bi">B</span></button><button type="button" class="btn boldt ic it" data-act="italic" aria-pressed="${l.italic}" aria-label="Pochyła" title="Pochyła"><span class="ii">I</span></button>${colorBtn(l.color)}<button type="button" class="btn x" data-act="del-line" aria-label="Usuń linię ${li+1}" title="Usuń linię">×</button></div>
   </div>`;
 }
 const idxOf=p=>plates.indexOf(p)+1;
@@ -380,14 +387,13 @@ function cardHtml(p){
       </div>
     </div>
     <div class="lines">
-      <div class="lines-label">Tekst na blaszce (każda linia osobno)</div>
+      <div class="lines-label">Tekst na blaszce (każda linia osobno) <span class="leg"><span class="bi">B</span> gruba <span class="ii">I</span> pochyła <span class="bi">A</span> kolor</span></div>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
     </div>
     <div class="foot">
       <label class="f" for="f-${p.id}"><span>Na dole blaszki: miejscowość i data (pisane pochyło, można zostawić puste)</span></label>
       <div class="footrow" data-li="foot">
-        <input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>
-        ${colorBtn(p.footerColor)}
+        <input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer">
       </div>
       <button type="button" class="btn small" data-act="footer-all">Wpisz to samo na wszystkich blaszkach</button>
     </div>
@@ -448,7 +454,7 @@ let popT=null;
 function curColor(){const {p,li}=popT;return (li==='foot'?p.footerColor:p.lines[li].color)||'#000000'}
 function setColor(c,all){
   const {p,li}=popT; c=okCol(c)||'#000000'; const v=c==='#000000'?null:c;
-  if(all){p.lines.forEach(l=>l.color=v);p.footerColor=v} else if(li==='foot') p.footerColor=v; else p.lines[li].color=v;
+  if(all){p.lines.forEach(l=>l.color=v)} else if(li==='foot') p.footerColor=v; else p.lines[li].color=v;
   rerenderCard(p); changed();
 }
 function openPop(btn,p,li){
