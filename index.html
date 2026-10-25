@@ -101,6 +101,8 @@ h1{font-size:34px;line-height:1.15;margin:0 0 6px;text-wrap:balance}
 .sheet svg{display:block;width:100%;height:100%}
 .sheet svg .pl{cursor:pointer}
 .sheet svg .pl:hover rect.box{fill:#e9f0fa}
+.chk{display:flex;gap:10px;align-items:center;font-size:17px;margin:0 0 12px;cursor:pointer}
+.chk input{width:24px;height:24px;accent-color:var(--accent)}
 .legend{font-size:16px;color:var(--muted);margin:10px 0 0}
 
 .msg{border-radius:10px;padding:14px 16px;font-size:19px;font-weight:700;margin-top:14px}
@@ -143,9 +145,9 @@ details.adv summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44p
     <div class="step-h"><div class="num" aria-hidden="true">1</div><div><h2 id="h1s">Wpisz treść blaszek</h2><p>Każda blaszka ma swoje okienko. Wymiar podaj w milimetrach.</p></div></div>
 
 
-    <div class="photo" id="photo" hidden>
-      <h3>Masz kartkę z napisami? Zrób zdjęcie</h3>
-      <p>Program sam odczyta tekst i wymiary ze zdjęcia. Potem wszystko sprawdzisz przed dodaniem.</p>
+    <div class="photo" id="photo">
+      <h3>Nie chcesz przepisywać? Zrób zdjęcie kartki</h3>
+      <p>Napisz tekst blaszek na kartce (może być odręcznie) albo weź gotowy wydruk lub zrzut ekranu. Program sam przepisze tekst i wymiary. Przed dodaniem wszystko sprawdzisz.</p>
       <div class="row">
         <button class="btn primary" id="btn-cam" type="button">Zrób zdjęcie aparatem</button>
         <button class="btn" id="btn-gal" type="button">Wybierz zdjęcie z galerii</button>
@@ -190,6 +192,7 @@ details.adv summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44p
       <div class="step-h"><div class="num" aria-hidden="true">2</div><div><h2 id="h2s">Sprawdź podgląd</h2><p>Tak blaszki ułożą się na kartce. Kliknij blaszkę, aby ją poprawić.</p></div></div>
       <p class="summary" id="summary"></p>
       <div id="warn-list"></div>
+      <label class="chk" for="o-cuts"><input type="checkbox" id="o-cuts" checked> Pokaż cięcia gilotyną przez całą kartkę (czerwone kreski, tylko w podglądzie)</label>
       <div class="sheets" id="sheets"></div>
       <p class="legend">Układ jest zawsze do cięcia gilotyną: najpierw tniesz kartkę w poprzek na pasy, potem każdy pas na blaszki. Żadne cięcie nie przechodzi przez inną blaszkę. Gdy blaszki nie zmieszczą się na jednej kartce, program sam zacznie następną.</p>
     </section>
@@ -331,7 +334,7 @@ function pack(items,o){
         if(p.h>r.h+E) continue;
         // 1) pod inną blaszką w tej samej kolumnie
         for(const c of r.cols){
-          if(p.w<=c.w+E && c.usedH+(c.n?g:0)+p.h<=r.h+E){
+          if(Math.abs(p.w-c.w)<E && c.usedH+(c.n?g:0)+p.h<=r.h+E){
             const waste=(c.w-p.w)*p.h;
             cand(si*1e9+waste,()=>put(s,r,c,p));
           }
@@ -468,9 +471,14 @@ function build(){
   renderPreview(); applyWarns();
 }
 function renderPreview(){
-  const {o,items,pages}=layout; const rgb=o.color;
+  const {o,items,pages,sheets}=layout; const rgb=o.color;
+  const showCuts=$('o-cuts').checked;
   $('sheets').innerHTML=pages.map((pg,i)=>{
     let s=`<svg viewBox="0 0 ${PAGE_W} ${PAGE_H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Kartka ${i+1}">`;
+    if(showCuts&&sheets&&sheets[i]){
+      const ys=new Set();sheets[i].rows.forEach(r=>{ys.add(+(o.margin+r.y).toFixed(3));ys.add(+(o.margin+r.y+r.h).toFixed(3))});
+      for(const y of ys) s+=`<line x1="0" x2="${PAGE_W}" y1="${y}" y2="${y}" stroke="#d62d20" stroke-width="0.35" stroke-dasharray="2 1.2"/>`;
+    }
     for(const p of pg){
       s+=`<g class="pl" data-id="${p.src.id}"><rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${Math.max(o.stroke,0.18)}"/>`;
       if(p.fs) for(const l of linePos(p,o)) s+=`<text x="${l.x}" y="${l.y}" text-anchor="middle" font-family="MontserratEmb, Montserrat, sans-serif" font-weight="${l.bold?700:400}" font-size="${l.size*PT}" fill="#000"${l.italic?` transform="translate(${l.x} ${l.y}) skewX(-12) translate(${-l.x} ${-l.y})"`:''}>${esc(l.text)}</text>`;
@@ -508,7 +516,7 @@ function applyWarns(){
 
 let t=null;
 function changed(){clearTimeout(t);t=setTimeout(()=>{build();persist()},180)}
-['o-margin','o-gap','o-padx','o-pady','o-max','o-lh','o-stroke','o-color'].forEach(id=>{$(id).addEventListener('input',changed);$(id).addEventListener('change',changed)});
+['o-margin','o-gap','o-padx','o-pady','o-max','o-lh','o-stroke','o-color','o-cuts'].forEach(id=>{$(id).addEventListener('input',changed);$(id).addEventListener('change',changed)});
 
 /* ---------- step 3: download ---------- */
 function fileName(){const d=new Date();return `blaszki-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.pdf`}
@@ -554,8 +562,8 @@ $('dl').addEventListener('click',async()=>{
 
 
 /* ---------- photo reading ---------- */
-let sampler=null, imgLimits=null, ocrCtl=null, ocrFound=null;
-const OCR_PROMPT=`Na zdjęciach są projekty grawerowanych blaszek (tabliczek) na pucharach gołębiarskich, zwykle po polsku.
+let photoState='wait', sampler=null, imgLimits=null, ocrCtl=null, ocrFound=null;
+const OCR_PROMPT=`Na zdjęciach są projekty grawerowanych blaszek (tabliczek) na pucharach gołębiarskich, po polsku. Może to być wydruk, zrzut ekranu albo kartka pisana odręcznie (długopisem, krzywo, z poprawkami). Pismo odręczne czytaj starannie, z kontekstu gołębiarskiego (np. konk., pkt., PZHGP, Oddział, Sekcja, V-CE MISTRZ, PRZODOWNIK, numery obrączek PL - 0123 - 24 - 1234). Przekreślony tekst pomiń. Na kartce odręcznej tekst pisany WIELKIMI literami lub podkreślony traktuj jako pogrubiony.
 Odczytaj KAŻDĄ blaszkę i odpowiedz wyłącznie JSON-em w tej postaci:
 {"plates":[{"w":80,"h":25,"lines":[{"text":"PZHGP Sekcja Hażlach II 2026","bold":false,"italic":false},{"text":"MISTRZ","bold":true,"italic":false}],"footer":"Hażlach, 25.10.2026"}]}
 
@@ -573,20 +581,25 @@ function initPhoto(){
   (function hook(){
     if(window.claude&&window.claude.use){
       window.claude.use('sample').then(async s=>{
-        if(!s) return;
+        if(!s){photoState='off';return}
         const lim=await s.limits().catch(()=>null);
-        if(!lim||!lim.images) return;
+        if(!lim||!lim.images){photoState='off';return}
         sampler=s; imgLimits=lim.images;
         const acc=(imgLimits.mediaTypes&&imgLimits.mediaTypes.length)?imgLimits.mediaTypes.join(','):'image/*';
         $('in-gal').accept=acc+',image/*'; $('in-cam').accept='image/*';
-        $('photo').hidden=false;
+        photoState='ready';
       }).catch(()=>{});
       return;
     }
-    if(++tries<50) setTimeout(hook,200);
+    if(++tries<50) setTimeout(hook,200); else photoState='off';
   })();
-  $('btn-cam').onclick=()=>$('in-cam').click();
-  $('btn-gal').onclick=()=>$('in-gal').click();
+  const go=id=>{
+    if(photoState==='ready') return $(id).click();
+    if(photoState==='wait') return ocrBox(`<p class="msg info" style="margin:0">Chwileczkę, przygotowuję czytanie zdjęć. Spróbuj za kilka sekund.</p>`);
+    ocrBox(`<p class="msg err" style="margin:0">Czytanie zdjęć działa tylko w Claude (w przeglądarce na claude.ai albo w aplikacji Claude na telefonie). Otwórz generator tam i spróbuj jeszcze raz.</p>`);
+  };
+  $('btn-cam').onclick=()=>go('in-cam');
+  $('btn-gal').onclick=()=>go('in-gal');
   $('in-cam').onchange=e=>{readPhotos([...e.target.files]);e.target.value=''};
   $('in-gal').onchange=e=>{readPhotos([...e.target.files]);e.target.value=''};
 }
@@ -609,12 +622,12 @@ async function readPhotos(files){
   files=files.slice(0,imgLimits.maxCount||1);
   const urls=files.map(f=>URL.createObjectURL(f));
   const thumbs=`<div class="thumbs">${urls.map(u=>`<img src="${u}" alt="Wybrane zdjęcie">`).join('')}</div>`;
-  ocrBox(`<div class="ocr-result">${thumbs}<p class="msg info" style="margin:0"><span class="spin" aria-hidden="true"></span>Czytam zdjęcie… To trwa zwykle od pół minuty do minuty.</p><div class="row"><button class="btn" id="ocr-stop" type="button">Przerwij</button></div></div>`);
+  ocrBox(`<div class="ocr-result">${thumbs}<p class="msg info" style="margin:0"><span class="spin" aria-hidden="true"></span>Czytam zdjęcie… To może potrwać do 2 minut. Nie zamykaj strony.</p><div class="row"><button class="btn" id="ocr-stop" type="button">Przerwij</button></div></div>`);
   ocrCtl=new AbortController();
   $('ocr-stop').onclick=()=>ocrCtl.abort();
   try{
     const imgs=await Promise.all(files.map(shrink));
-    const res=await sampler.json(OCR_PROMPT,{images:imgs,signal:ocrCtl.signal});
+    const res=await sampler.json(OCR_PROMPT,{images:imgs,signal:ocrCtl.signal,modelTier:'complex'});
     const list=(res&&Array.isArray(res.plates)?res.plates:Array.isArray(res)?res:[]).map(p=>{
       const lines=(Array.isArray(p.lines)?p.lines:[]).map(l=>typeof l==='string'?{text:l,bold:false}:{text:String(l.text||'').trim(),bold:!!l.bold,italic:!!l.italic}).filter(l=>l.text);
       const w=num(p.w,0),h=num(p.h,0);
