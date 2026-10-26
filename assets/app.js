@@ -227,7 +227,7 @@ function fitMedal(p,o){
     if(!fits(ps)){const originals=lines.map(l=>l.size);lines.forEach((l,i)=>l.size=null);const max=Math.max(...originals.map(z=>z||cap));let a=0,b=max;for(let i=0;i<40;i++){const mid=(a+b)/2;if(fits(positions(mid)))a=mid;else b=mid}ps=positions(a);}
     lines.forEach((l,i)=>{l.size=ps[i].size;l.offsetY=ps[i].y});return Math.max(...ps.map(a=>a.size));
   }
-  const base=group(body,p.h*(foot.length?.42:.5),p.h*.10,p.h*(foot.length?.66:.90),p.pt||p.w*1.1,1.12);
+  const base=group(body,p.h*(foot.length?.45:.525),p.h*.16,p.h*(foot.length?.67:.90),p.pt||p.w*.22,1.32);
   group(foot,p.h*.79,p.h*.69,p.h*.91,Math.min(base?base*.48:p.w*.24,p.w*.24),1.15);
   p.fs=1;p.blockH=0;p.overflow=false;p.small=false;
 }
