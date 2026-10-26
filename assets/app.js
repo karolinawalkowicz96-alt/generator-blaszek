@@ -159,11 +159,13 @@ function fit(p,o){
   const lines=p.lines.filter(l=>l.text.trim()).map(l=>({...l,scale:1,gap:0}));
   if(p.footer&&p.footer.trim()){
     const foot=p.shape==='medal'?p.footer.split('\n').map(t=>t.trim()).filter(Boolean):[p.footer.trim()];
-    foot.forEach((text,i)=>lines.push({text,bold:false,italic:true,color:p.footerColor,scale:FOOT_SCALE,gap:i?0:lines.length?(p.shape==='medal'?0.9:FOOT_GAP):0,footer:true}));
+    foot.forEach((text,i)=>lines.push({text,bold:false,italic:true,color:p.footerColor,scale:p.shape==='medal'?0.68:FOOT_SCALE,gap:i?0:lines.length?(p.shape==='medal'?0.9:FOOT_GAP):0,footer:true}));
   }
   p.vis=lines;
   const n=lines.length; if(!n||p.w<=0||p.h<=0){p.fs=0;p.overflow=false;p.small=false;return}
-  const medal=p.shape==='medal', inset=medal?Math.max(1,p.w*0.035):0;
+  const medal=p.shape==='medal';
+  const safeDiameter=({27:24.5,41:38.5,52:49.5})[p.w]||p.w-2.5;
+  const inset=medal?(p.w-safeDiameter)/2+0.5:0;
   const availW=p.w-2*(medal?inset:o.padx), availH=p.h-2*(medal?inset:o.pady);
   const sizes=base=>lines.map(l=>lineSize(l.size)||(medal?Math.min(base*l.scale,availW/Math.max(0.001,textW(l.text,l.bold,1,l.italic,l.font))):base*l.scale));
   const height=ss=>ascent(lines[0])*ss[0]+descent(lines[n-1])*ss[n-1]+ss.slice(1).reduce((sum,z,i)=>sum+lineStep(lines[i],lines[i+1],ss[i],z,o),0);
@@ -185,10 +187,16 @@ function fit(p,o){
     for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH&&circleFits(ss,medal?inset:Math.max(o.padx,o.pady)))lo=mid;else hi=mid}
     fs=Math.max(0.1,Math.floor(lo*10+1e-7)/10);
   }
-  const ss=sizes(fs);
+  let ss=sizes(fs);
+  // Keep even manually sized medal text within the safe print circle.
+  if(medal&&!circleFits(ss,inset)){
+    let lo=0,hi=1;
+    for(let i=0;i<36;i++){const k=(lo+hi)/2;if(circleFits(ss.map(z=>z*k),inset))lo=k;else hi=k}
+    ss=ss.map(z=>z*lo);fs*=lo;
+  }
   lines.forEach((l,i)=>l.size=ss[i]);
   p.fs=fs;p.blockH=height(ss)*PT;
-  p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,0.3);
+  p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,medal?(p.w-safeDiameter)/2:0.3);
   p.small=!medal&&!p.overflow&&Math.min(...ss)<6;
 }
 function linePos(p,o){
