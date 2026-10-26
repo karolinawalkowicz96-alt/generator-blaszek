@@ -1,4 +1,4 @@
-name: One-time replace Generator index
+name: One-time compact footer controls
 
 on:
   push:
@@ -10,51 +10,48 @@ permissions:
   contents: write
 
 jobs:
-  replace-index:
+  patch-ui:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Replace index.html with corrected version
-        shell: bash
+      - name: Remove footer copy-all control and compact spacing
+        shell: python
         run: |
-          python - <<'PY'
           from pathlib import Path
-          import hashlib
+          import re
 
-          path = Path('index.html')
-          data = path.read_bytes()
-          expected_before = 'eb78aed05df639b9174e03de6ebd6f4e61221e62'
-          expected_after = '6bc91eb601430bc58c5fda3a8817694d4d9818c3'
+          app = Path('assets/app.js')
+          s = app.read_text(encoding='utf-8')
 
-          before = hashlib.sha1(data).hexdigest()
-          if before != expected_before:
-              raise SystemExit(f'Unexpected index.html SHA1: {before}; refusing to modify')
+          button = '      <button type="button" class="btn small" data-act="footer-all">Wpisz to samo we wszystkich projektach</button>\n'
+          if button not in s:
+              raise SystemExit('footer-all button not found')
+          s = s.replace(button, '', 1)
 
-          text = data.decode('utf-8')
-          text = text.replace('.line input', '.line > input')
+          pattern = r"\n  else if\(act==='footer-all'\)\{.*?\n  \}\n  else if\(act==='bold'\)"
+          s, n = re.subn(pattern, "\n  else if(act==='bold')", s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit(f'footer-all handler replacements: {n}')
+          app.write_text(s, encoding='utf-8')
 
-          anchor = '@media (prefers-reduced-motion:no-preference){.plate{transition:border-color .2s,box-shadow .2s}}\n'
-          insert = '''\n/* Typography controls: inputs inside column labels must not inherit text-row flex sizing. */\n.line-type .f input,.line-type .f select{\n  flex:none;box-sizing:border-box;height:44px;min-height:44px;max-height:44px;\n}\n.line-type .btn{height:44px;min-height:44px;box-sizing:border-box;align-self:end}\n'''
-          if text.count(anchor) != 1:
-              raise SystemExit('Expected CSS anchor not found exactly once; refusing to modify')
-          text = text.replace(anchor, anchor + insert, 1)
+          index = Path('index.html')
+          h = index.read_text(encoding='utf-8')
+          if 'assets/app.js?v=14' in h:
+              h = h.replace('assets/app.js?v=14', 'assets/app.js?v=15', 1)
+          h = h.replace('.foot{border-top:1px solid #e0e6ee;padding-top:16px}', '.foot{border-top:1px solid #e0e6ee;padding-top:13px}', 1)
+          h = h.replace('.plate>.row{border-top:1px solid #e0e6ee;padding-top:15px}', '.plate>.row{border-top:1px solid #e0e6ee;padding-top:10px}', 1)
+          index.write_text(h, encoding='utf-8')
 
-          out = text.encode('utf-8')
-          after = hashlib.sha1(out).hexdigest()
-          if after != expected_after:
-              raise SystemExit(f'Corrected file SHA1 mismatch: {after}; refusing to commit')
-          path.write_bytes(out)
-          print(f'index.html verified: {before} -> {after}')
-          PY
-
-      - name: Commit corrected index.html
+      - name: Commit UI changes
         shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -- index.html
-          git diff --cached --quiet && { echo "No change to commit"; exit 1; }
-          git commit -m "Replace index.html with corrected version"
+          git add assets/app.js index.html
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "Remove footer copy-all control and compact card actions"
           git push origin HEAD:main
