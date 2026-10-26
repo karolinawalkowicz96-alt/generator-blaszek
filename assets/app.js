@@ -342,7 +342,6 @@ function cardHtml(p){
         ${p.shape==='medal'?`<textarea id="f-${p.id}" rows="2" placeholder="Miejscowość&#10;Data" data-act="footer" aria-describedby="footer-help-${p.id}"${p.footerColor?` style="color:${p.footerColor}"`:''}>${esc(p.footer||'')}</textarea>`:`<input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>`}
         ${p.shape==='medal'?`<small id="footer-help-${p.id}" class="footer-help">Enter dodaje kolejną linię dolnego napisu.</small>`:''}
       </div>
-      <button type="button" class="btn small" data-act="footer-all">Wpisz to samo we wszystkich projektach</button>
     </div>
     <div class="plate-warn" data-warn hidden></div>
     <div class="row">
@@ -396,11 +395,6 @@ $('cards').addEventListener('click',e=>{
   if(act==='line-auto'){const li=+b.closest('.line').dataset.li;p.lines[li].size=null;rerenderCard(p);changed();$('card-'+p.id).querySelectorAll('[data-act="line-size"]')[li].focus();return}
   if(act==='color'){const li=b.closest('[data-li]').dataset.li;openPop(b,p,li==='foot'?'foot':+li);return}
   if(act==='italic'){const li=+b.closest('.line').dataset.li;p.lines[li].italic=!p.lines[li].italic;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
-  else if(act==='footer-all'){
-    const v=p.footer.trim(); const old=plates.map(q=>q.footer);
-    plates.forEach(q=>q.footer=q.shape==='medal'?v:v.replace(/\n/g,', ')); renderCards(); changed(); flash(p,false);
-    toast(v?`Wpisano „${v}” na wszystkich blaszkach.`:'Usunięto dolny napis ze wszystkich blaszek.',()=>{plates.forEach((q,i)=>q.footer=old[i]);renderCards();changed()});
-  }
   else if(act==='bold'){const li=+b.closest('.line').dataset.li;p.lines[li].bold=!p.lines[li].bold;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
   else if(act==='del-line'){const li=+b.closest('.line').dataset.li;p.lines.splice(li,1);rerenderCard(p);changed()}
   else if(act==='add-line'){p.lines.push({text:'',bold:false});rerenderCard(p);focusLine(p,p.lines.length-1);changed()}
