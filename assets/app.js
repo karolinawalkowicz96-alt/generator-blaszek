@@ -53,7 +53,7 @@ const descent=l=>l.font==='vibes'?0.5:l.font==='charm'?0.35:0.22;
 const lineStep=(prev,next,a,b,o)=>Math.max(0.22*a+(o.lh-0.22)*b,descent(prev)*a+(ascent(next)+0.15)*b)+next.gap*(b/next.scale);
 const MEDAL_SIZES=[27,41,52];
 const safeDiameter=p=>({27:23.5,41:37.5,52:48.5})[p.w]||p.w-3.5;
-const validLogo=l=>l&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(l.data)&&l.data.length<1500000&&l.w>0&&l.h>0?{data:l.data,w:l.w,h:l.h,r:Number.isFinite(l.r)&&l.r>0?l.r:Math.hypot(l.w,l.h)/2}:null;
+const validLogo=l=>l&&/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(l.data)&&l.w>0&&l.h>0?{data:l.data,w:l.w,h:l.h,r:Number.isFinite(l.r)&&l.r>0?l.r:Math.hypot(l.w,l.h)/2}:null;
 const itemName=p=>p.shape==='medal'?'Medal':'Blaszka';
 const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,logo:validLogo(p.logo),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
 let plates=[];
@@ -167,6 +167,7 @@ function fit(p,o){
   p.vis=lines;
   const n=lines.length; if(!n||p.w<=0||p.h<=0){p.fs=0;p.overflow=false;p.small=false;return}
   const medal=p.shape==='medal';
+  if(medal){fitMedal(p,o);return}
   const diameter=safeDiameter(p);
   const inset=medal?(p.w-diameter)/2:0;
   const availW=p.w-2*(medal?inset:o.padx), availH=p.h-2*(medal?inset:o.pady);
@@ -202,8 +203,37 @@ function fit(p,o){
   p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,medal?(p.w-diameter)/2:0.3);
   p.small=!medal&&!p.overflow&&Math.min(...ss)<6;
 }
+function fitMedal(p,o){
+  const radius=safeDiameter(p)/2,center=p.w/2;
+  const body=p.vis.filter(l=>!l.footer),foot=p.vis.filter(l=>l.footer);
+  function group(lines,cy,top,bottom,cap,spacing){
+    if(!lines.length)return 0;
+    const positions=base=>{
+      const sizes=lines.map(l=>lineSize(l.size)||base);
+      const steps=sizes.map((z,i)=>i?Math.max(descent(lines[i-1])*sizes[i-1]+(ascent(lines[i])+.13)*z,spacing*z):0);
+      const height=(ascent(lines[0])*sizes[0]+descent(lines.at(-1))*sizes.at(-1)+steps.reduce((a,b)=>a+b,0))*PT;
+      let y=cy-height/2+ascent(lines[0])*sizes[0]*PT;
+      return lines.map((l,i)=>{y+=steps[i]*PT;return {size:sizes[i],y}});
+    };
+    const fits=ps=>ps.every((a,i)=>{
+      const l=lines[i],t=a.y-ascent(l)*a.size*PT,b=a.y+descent(l)*a.size*PT;
+      const edge=Math.max(Math.abs(t-center),Math.abs(b-center));
+      return t>=top&&b<=bottom&&edge<radius&&textW(l.text,l.bold,a.size,l.italic,l.font)<=2*Math.sqrt(radius*radius-edge*edge);
+    });
+    let lo=0,hi=cap;
+    for(let i=0;i<40;i++){const mid=(lo+hi)/2;if(fits(positions(mid)))lo=mid;else hi=mid}
+    let ps=positions(lo);
+    // Manual sizes share the same hard safe circle constraint.
+    if(!fits(ps)){const originals=lines.map(l=>l.size);lines.forEach((l,i)=>l.size=null);const max=Math.max(...originals.map(z=>z||cap));let a=0,b=max;for(let i=0;i<40;i++){const mid=(a+b)/2;if(fits(positions(mid)))a=mid;else b=mid}ps=positions(a);}
+    lines.forEach((l,i)=>{l.size=ps[i].size;l.offsetY=ps[i].y});return Math.max(...ps.map(a=>a.size));
+  }
+  const base=group(body,p.h*(foot.length?.42:.5),p.h*.10,p.h*(foot.length?.66:.90),p.pt||p.w*1.1,1.12);
+  group(foot,p.h*.79,p.h*.69,p.h*.91,Math.min(base?base*.48:p.w*.24,p.w*.24),1.15);
+  p.fs=1;p.blockH=0;p.overflow=false;p.small=false;
+}
 function linePos(p,o){
   const L=p.vis;
+  if(p.shape==='medal')return L.map(l=>({...l,x:p.x+p.w/2,y:p.y+l.offsetY}));
   let y=p.y+(p.h-p.blockH)/2+(p.shape==='medal'?p.w*0.025:0)+ascent(L[0])*L[0].size*PT;
   return L.map((l,i)=>{if(i)y+=lineStep(L[i-1],l,L[i-1].size,l.size,o)*PT;return {...l,x:p.x+p.w/2,y}});
 }
@@ -231,23 +261,41 @@ function logoBox(p){
   const w=p.logo.w*k,h=p.logo.h*k;
   return {x:p.x+(p.w-w)/2,y:p.y+(p.h-h)/2,w,h};
 }
-// Decode locally and trim empty/white outer pixels before fitting; no image is uploaded.
+// The crop preview and export use exactly the same transform and circular mask.
 async function readLogo(file){
   if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Wybierz plik PNG, JPG lub WebP.');
-  if(file.size>15*1024*1024)throw Error('Logo może mieć maksymalnie 15 MB.');
   const url=URL.createObjectURL(file),img=new Image();
-  try{img.src=url;await img.decode();
-    const scale=Math.min(1,1200/Math.max(img.naturalWidth,img.naturalHeight));
-    const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));
-    const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,c.width,c.height);
-    const {data}=ctx.getImageData(0,0,c.width,c.height);let x0=c.width,y0=c.height,x1=-1,y1=-1;
-    for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){const i=(y*c.width+x)*4;if(data[i+3]>16&&Math.min(data[i],data[i+1],data[i+2])<248){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}}
-    if(x1<0)throw Error('Nie znaleziono widocznego logo w tym pliku.');
-    const w=x1-x0+1,h=y1-y0+1,out=document.createElement('canvas');const k=Math.min(1,800/Math.max(w,h));out.width=Math.max(1,Math.round(w*k));out.height=Math.max(1,Math.round(h*k));out.getContext('2d').drawImage(c,x0,y0,w,h,0,0,out.width,out.height);
-    const pixels=out.getContext('2d').getImageData(0,0,out.width,out.height).data;let radius=0;for(let y=0;y<out.height;y++)for(let x=0;x<out.width;x++){const i=(y*out.width+x)*4;if(pixels[i+3]>16)radius=Math.max(radius,Math.hypot(Math.abs(x+0.5-out.width/2)+0.5,Math.abs(y+0.5-out.height/2)+0.5));}
-    const logo={data:out.toDataURL('image/png'),w:out.width,h:out.height,r:radius};if(!validLogo(logo))throw Error('Plik jest zbyt szczegółowy. Wybierz mniejsze logo.');return logo;
-  }finally{URL.revokeObjectURL(url)}
+  try{img.src=url;await img.decode();return await cropLogo(img)}finally{URL.revokeObjectURL(url)}
 }
+function cropLogo(img){
+  return new Promise(resolve=>{
+    const dialog=document.createElement('dialog');dialog.className='crop-dialog';
+    dialog.innerHTML=`<form method="dialog"><div class="crop-heading"><div><h2 id="crop-title">Dopasuj logo do medalu</h2><p>Przesuń grafikę i ustaw powiększenie.</p></div><button class="btn" value="cancel" aria-label="Zamknij kadrowanie">×</button></div>
+      <div class="crop-stage"><canvas width="600" height="600" aria-label="Podgląd kadru logo. Przeciągnij grafikę lub użyj strzałek poniżej." tabindex="0"></canvas></div>
+      <label class="crop-zoom">Powiększenie <output>100%</output><input aria-label="Powiększenie logo" type="range" min="20" max="400" value="100" step="1"></label>
+      <div class="crop-tools"><div class="crop-arrows" role="group" aria-label="Przesuń logo"><button type="button" class="btn" data-move="-10,0" aria-label="Przesuń w lewo">←</button><button type="button" class="btn" data-move="0,-10" aria-label="Przesuń w górę">↑</button><button type="button" class="btn" data-move="0,10" aria-label="Przesuń w dół">↓</button><button type="button" class="btn" data-move="10,0" aria-label="Przesuń w prawo">→</button></div><button type="button" class="btn" data-reset>Wyśrodkuj i dopasuj</button></div>
+      <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. Sprawdź kadr przed zatwierdzeniem — zachowamy Twoje ustawienie i bezpieczny margines.</p>
+      <div class="crop-actions"><button class="btn" value="cancel">Anuluj</button><button class="btn primary" type="button" data-save>Zatwierdź kadr</button></div></form>`;
+    dialog.setAttribute('aria-labelledby','crop-title');document.body.append(dialog);
+    const canvas=dialog.querySelector('canvas'),ctx=canvas.getContext('2d'),range=dialog.querySelector('input'),output=dialog.querySelector('output');
+    let dx=0,dy=0,zoom=1,drag=null,done=false;
+    const base=600/Math.max(img.naturalWidth,img.naturalHeight);
+    function paint(target,size,preview){const c=target.getContext('2d'),k=size/600;c.clearRect(0,0,size,size);c.save();c.beginPath();c.arc(size/2,size/2,size/2,0,Math.PI*2);c.clip();c.fillStyle='#fff';c.fillRect(0,0,size,size);const w=img.naturalWidth*base*zoom*k,h=img.naturalHeight*base*zoom*k;c.drawImage(img,size/2+dx*k-w/2,size/2+dy*k-h/2,w,h);c.restore();if(preview){c.strokeStyle='#245cc7';c.lineWidth=3;c.beginPath();c.arc(size/2,size/2,size/2-2,0,Math.PI*2);c.stroke()}}
+    function draw(){paint(canvas,600,true);output.textContent=Math.round(zoom*100)+'%';range.value=Math.round(zoom*100)}
+    range.oninput=()=>{zoom=+range.value/100;draw()};
+    canvas.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)};
+    canvas.onpointermove=e=>{if(!drag)return;const k=600/canvas.getBoundingClientRect().width;dx+=(e.clientX-drag.x)*k;dy+=(e.clientY-drag.y)*k;drag={x:e.clientX,y:e.clientY};draw()};
+    canvas.onpointerup=canvas.onpointercancel=()=>drag=null;
+    canvas.onkeydown=e=>{const moves={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,-10],ArrowDown:[0,10]};if(moves[e.key]){e.preventDefault();dx+=moves[e.key][0];dy+=moves[e.key][1];draw()}};
+    dialog.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{const [x,y]=b.dataset.move.split(',').map(Number);dx+=x;dy+=y;draw()});
+    dialog.querySelector('[data-reset]').onclick=()=>{dx=dy=0;zoom=1;draw()};
+    const finish=value=>{if(done)return;done=true;dialog.close();dialog.remove();resolve(value)};
+    dialog.oncancel=e=>{e.preventDefault();finish(null)};dialog.onclose=()=>finish(null);
+    dialog.querySelector('[data-save]').onclick=()=>{const out=document.createElement('canvas');out.width=out.height=1000;paint(out,1000,false);finish({data:out.toDataURL('image/png'),w:1000,h:1000,r:500})};
+    draw();dialog.showModal();
+  });
+}
+
 /* ---------- step 1: cards ---------- */
 const colorBtn=c=>`<button type="button" class="btn boldt ic colbtn" data-act="color" aria-label="Kolor liter" title="Kolor liter"><span class="ai">A<span class="bar" style="background:${c||'#000000'}"></span></span></button>`;
 function lineRow(p,li){
@@ -282,7 +330,7 @@ function cardHtml(p){
         <label class="f n"><span>Liczba sztuk</span><input type="number" inputmode="numeric" step="1" min="1" id="c-${p.id}" value="${p.copies}" data-act="copies"></label>
       </div>
     </div>
-    ${p.shape==='medal'?`<div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Automatyczne dopasowanie do bezpiecznego obszaru.':'Dodaj osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div>`:''}
+    ${p.shape==='medal'?`<div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr z bezpiecznym marginesem.':'Wybierz grafikę i przytnij ją w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div>`:''}
     <div class="lines" ${p.logo?'hidden':''}>
       <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Puste pole rozmiaru = Auto. Wpisz wartość, aby powiększyć lub pomniejszyć linię. Przycisk Auto przywraca dopasowanie.</p>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
@@ -320,7 +368,7 @@ $('cards').addEventListener('input',e=>{
 $('cards').addEventListener('change',async e=>{
   if(e.target.dataset.act!=='logo-file')return;
   const input=e.target,p=byId(input.closest('.plate').dataset.id),file=input.files[0];if(!file)return;
-  try{const logo=await readLogo(file);if(!plates.includes(p))return;
+  try{const logo=await readLogo(file);if(!logo||!plates.includes(p))return;
     if(p.logo){p.logo=logo;rerenderCard(p);changed()}
     else{const back=mk({shape:'medal',w:p.w,copies:p.copies,logo,lines:[]});plates.splice(plates.indexOf(p)+1,0,back);renderCards();changed();flash(back,true)}
     toast('Logo dopasowane. Rewers jest osobnym elementem do wydruku.');
@@ -586,6 +634,7 @@ function init(){
   let tries=0;(function hook(){if(window.claude&&window.claude.use){window.claude.use('downloads').then(d=>{downloads=d}).catch(()=>{});return}if(++tries<10)setTimeout(hook,300)})();
 }
 init();
+
 
 
 
