@@ -230,6 +230,19 @@ function fitMedal(p,o){
   const base=group(body,p.h*(foot.length?.45:.525),p.h*.16,p.h*(foot.length?.67:.90),p.pt||p.w*.22,1.32);
   const bodySize=body.length>1?Math.max(...body.slice(1).map(l=>l.size)):base;
   group(foot,p.h*.74,p.h*.68,p.h*.86,Math.max(.1,(bodySize||p.w*.22)-1),1.15);
+  if(body.length>1&&foot.length){
+    const title=body[0],second=body[1],last=body.at(-1);
+    const secondTop=second.offsetY-ascent(second)*second.size*PT;
+    const bodyBottom=last.offsetY+descent(last)*last.size*PT;
+    const footerTop=foot[0].offsetY-ascent(foot[0])*foot[0].size*PT;
+    const halfWidth=textW(title.text,title.bold,title.size,title.italic,title.font)/2;
+    const minTitleTop=center-Math.sqrt(Math.max(0,radius*radius-halfWidth*halfWidth));
+    const titleHeight=(ascent(title)+descent(title))*title.size*PT;
+    const gap=Math.max(0,Math.min(footerTop-bodyBottom,secondTop-minTitleTop-titleHeight));
+    title.offsetY=secondTop-gap-descent(title)*title.size*PT;
+    const shift=bodyBottom+gap-footerTop;
+    foot.forEach(l=>l.offsetY+=shift);
+  }
   p.fs=1;p.blockH=0;p.overflow=false;p.small=false;
 }
 function linePos(p,o){
