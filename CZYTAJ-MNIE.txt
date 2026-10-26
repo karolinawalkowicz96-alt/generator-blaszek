@@ -1,23 +1,25 @@
 GENERATOR BLASZEK by Dawid Tokarski
 
-Otwórz index.html w przeglądarce lub zastąp nim plik na hostingu.
-Strona działa bez instalacji. Biblioteka PDF i czcionki są osadzone lokalnie.
+JAK WGRAĆ
+Wgraj na serwer CAŁĄ zawartość tego folderu, zachowując strukturę:
+  index.html
+  assets/   (app.js, jspdf.umd.min.js, logo, ikony, fonts/)
+Stary plik index.html zastąp nowym. Folder assets musi leżeć obok index.html.
+Strona nie działa po otwarciu index.html bezpośrednio z dysku (file://) —
+potrzebny jest serwer www (np. GitHub Pages, hosting).
 
-Przy każdej linii:
-- Rozmiar (pt): puste pole oznacza Auto. Wpisz od 4,5 do 200 pt, aby
-  ustawić własny rozmiar. Przycisk Auto przywraca dopasowanie.
-- Czcionka: Montserrat lub Times — Liberation Serif (odpowiednik Times New Roman).
-- Dotychczasowe pogrubienie, kursywa i kolor działają także z nową czcionką.
+FORMAT TEKSTOWY (zakładka „Wklejam gotowy tekst”)
+  *tekst            pogrubienie
+  _tekst            kursywa
+  @tekst            dolny napis (miejscowość, data)
+  [czerwony]tekst   kolor: czarny, szary, czerwony, bordowy, pomarańczowy, złoty,
+                    zielony, ciemnozielony, niebieski, granatowy, fioletowy, brązowy
+                    (lub dowolny kod, np. [#c00000])
+  [20pt]tekst       własny rozmiar
+  [times] [charm] [vibes]   czcionka (bez znacznika: Montserrat)
+  80x25 3szt        wymiary i liczba sztuk
+Stare zapisy {pt:20}, {font:serif}, {#c00000} nadal działają.
 
-Rozmiar ręczny pozostaje stały po zmianie wymiarów blaszki. Pozostałe linie
-nadal dopasowują się automatycznie. Zbyt duży tekst wywołuje ostrzeżenie.
-Podgląd i PDF korzystają z tych samych czcionek i rozmiarów.
-Ustawienia zachowują się przy zapisie i duplikowaniu. W trybie tekstowym
-formatowanie zapisują znaczniki {pt:28} oraz {font:serif} przed treścią linii.
-
-Nagłówek: Generator Blaszek, z subtelnym podpisem by Dawid Tokarski.
-
-Weryfikacja: automatyczny i ręczny rozmiar, mieszany układ linii,
-przekroczenie wymiarów, duplikowanie, format tekstowy i generowanie PDF
-z polskimi znakami. Nie przeprowadzono wizualnego testu w przeglądarce
-w tym środowisku (brak dostępnego Chromium).
+SZYBKOŚĆ
+Strona waży ok. 43 KB zamiast 3 MB. Program do PDF i czcionki wczytują się
+w tle; czcionka Times pobiera się dopiero, gdy ktoś jej użyje.
