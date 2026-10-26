@@ -52,8 +52,10 @@ const ascent=l=>l.font==='vibes'?1.1:l.font==='charm'?0.95:0.72;
 const descent=l=>l.font==='vibes'?0.5:l.font==='charm'?0.35:0.22;
 const lineStep=(prev,next,a,b,o)=>Math.max(0.22*a+(o.lh-0.22)*b,descent(prev)*a+(ascent(next)+0.15)*b)+next.gap*(b/next.scale);
 const MEDAL_SIZES=[27,41,52];
+const safeDiameter=p=>({27:23.5,41:37.5,52:48.5})[p.w]||p.w-3.5;
+const validLogo=l=>l&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(l.data)&&l.data.length<1500000&&l.w>0&&l.h>0?{data:l.data,w:l.w,h:l.h,r:Number.isFinite(l.r)&&l.r>0?l.r:Math.hypot(l.w,l.h)/2}:null;
 const itemName=p=>p.shape==='medal'?'Medal':'Blaszka';
-const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
+const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,logo:validLogo(p.logo),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
 let plates=[];
 const KEY='blaszki-state-v3';
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(plates.map(({id,...r})=>r)));localStorage.setItem(KEY+'-options',JSON.stringify(opts()));$('save-status').textContent='Zapisano w przeglądarce'}catch(e){$('save-status').textContent='Nie udało się zapisać danych'}}
@@ -134,7 +136,7 @@ const colorTag=c=>c&&c!=='#000000'?`[${colorName(c)||c}]`:'';
 const sizeTag=v=>v?`[${String(v).replace('.',',')}pt]`:'';
 const fontTag=f=>({serif:'[times]',charm:'[charm]',vibes:'[vibes]'})[fontKey(f)]||'';
 function toText(){
-  return plates.map(p=>[(p.shape==='medal'?`medal ${p.w}mm`:`${p.w}x${p.h}`)+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
+  return plates.filter(p=>!p.logo).map(p=>[(p.shape==='medal'?`medal ${p.w}mm`:`${p.w}x${p.h}`)+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
     ...p.lines.map(l=>(l.bold?'*':'')+(l.italic?'_':'')+colorTag(l.color)+sizeTag(l.size)+fontTag(l.font)+l.text),
     ...(p.footer?p.footer.split('\n').map(t=>'@'+colorTag(p.footerColor)+t):[])].join('\n')).join('\n\n');
 }
@@ -156,16 +158,17 @@ function opts(){
     max:num($('o-max').value,14),lh:num($('o-lh').value,1.45),stroke:num($('o-stroke').value,0.1),color:$('o-color').value};
 }
 function fit(p,o){
+  if(p.shape==='medal'&&p.logo){p.vis=[];p.fs=0;p.overflow=false;p.small=false;return}
   const lines=p.lines.filter(l=>l.text.trim()).map(l=>({...l,scale:1,gap:0}));
   if(p.footer&&p.footer.trim()){
     const foot=p.shape==='medal'?p.footer.split('\n').map(t=>t.trim()).filter(Boolean):[p.footer.trim()];
-    foot.forEach((text,i)=>lines.push({text,bold:false,italic:true,color:p.footerColor,scale:p.shape==='medal'?0.68:FOOT_SCALE,gap:i?0:lines.length?(p.shape==='medal'?0.9:FOOT_GAP):0,footer:true}));
+    foot.forEach((text,i)=>lines.push({text,bold:false,italic:true,color:p.footerColor,scale:p.shape==='medal'?0.68:FOOT_SCALE,gap:i?0:lines.length?(p.shape==='medal'?1.35:FOOT_GAP):0,footer:true}));
   }
   p.vis=lines;
   const n=lines.length; if(!n||p.w<=0||p.h<=0){p.fs=0;p.overflow=false;p.small=false;return}
   const medal=p.shape==='medal';
-  const safeDiameter=({27:24.5,41:38.5,52:49.5})[p.w]||p.w-2.5;
-  const inset=medal?(p.w-safeDiameter)/2+0.5:0;
+  const diameter=safeDiameter(p);
+  const inset=medal?(p.w-diameter)/2:0;
   const availW=p.w-2*(medal?inset:o.padx), availH=p.h-2*(medal?inset:o.pady);
   const sizes=base=>lines.map(l=>lineSize(l.size)||(medal?Math.min(base*l.scale,availW/Math.max(0.001,textW(l.text,l.bold,1,l.italic,l.font))):base*l.scale));
   const height=ss=>ascent(lines[0])*ss[0]+descent(lines[n-1])*ss[n-1]+ss.slice(1).reduce((sum,z,i)=>sum+lineStep(lines[i],lines[i+1],ss[i],z,o),0);
@@ -173,7 +176,7 @@ function fit(p,o){
   const circleFits=(ss,padding)=>{
     if(p.shape!=='medal')return true;
     const r=Math.max(0,p.w/2-padding), block=height(ss)*PT;
-    let y=-block/2+ascent(lines[0])*ss[0]*PT;
+    let y=-block/2+p.w*0.025+ascent(lines[0])*ss[0]*PT;
     return lines.every((l,i)=>{
       if(i)y+=lineStep(lines[i-1],l,ss[i-1],ss[i],o)*PT;
       const edge=Math.max(Math.abs(y-ascent(l)*ss[i]*PT),Math.abs(y+descent(l)*ss[i]*PT));
@@ -196,50 +199,55 @@ function fit(p,o){
   }
   lines.forEach((l,i)=>l.size=ss[i]);
   p.fs=fs;p.blockH=height(ss)*PT;
-  p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,medal?(p.w-safeDiameter)/2:0.3);
+  p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,medal?(p.w-diameter)/2:0.3);
   p.small=!medal&&!p.overflow&&Math.min(...ss)<6;
 }
 function linePos(p,o){
   const L=p.vis;
-  let y=p.y+(p.h-p.blockH)/2+ascent(L[0])*L[0].size*PT;
+  let y=p.y+(p.h-p.blockH)/2+(p.shape==='medal'?p.w*0.025:0)+ascent(L[0])*L[0].size*PT;
   return L.map((l,i)=>{if(i)y+=lineStep(L[i-1],l,L[i-1].size,l.size,o)*PT;return {...l,x:p.x+p.w/2,y}});
 }
-/* Układ gilotynowy: kartka -> pasy na całą szerokość -> kolumny w pasie -> blaszki jedna pod drugą w kolumnie. */
+/* Each free rectangle is split by straight guillotine cuts; circles use their square bounds. */
 function pack(items,o){
-  const W=PAGE_W-2*o.margin, HH=PAGE_H-2*o.margin, g=o.gap, E=1e-6;
-  const sheets=[], bad=[];
-  const list=items.slice().sort((a,b)=>b.h-a.h||b.w-a.w);
-  const newRow=(s,h)=>{const r={y:s.usedH+(s.rows.length?g:0),h,usedW:0,cols:[]};s.rows.push(r);s.usedH=r.y+h;return r};
-  const newCol=(r,w)=>{const c={x:r.usedW+(r.cols.length?g:0),w,usedH:0,n:0};r.cols.push(c);r.usedW=c.x+w;return c};
-  const put=(s,r,c,p)=>{const y=r.y+c.usedH+(c.n?g:0);c.usedH=y-r.y+p.h;c.n++;p.x=o.margin+c.x;p.y=o.margin+y;s.items.push(p)};
-  for(const p of list){
-    if(p.w<=0||p.h<=0||p.w>W+E||p.h>HH+E){bad.push(p);continue}
+  const W=PAGE_W-2*o.margin,H=PAGE_H-2*o.margin,g=Math.max(0,o.gap),E=1e-6;
+  const sheets=[],bad=[];
+  for(const p of items.slice().sort((a,b)=>b.h-a.h||b.w-a.w)){
+    if(p.w<=0||p.h<=0||p.w>W+E||p.h>H+E){bad.push(p);continue}
     let best=null;
-    const cand=(score,fn)=>{if(!best||score<best.score-E)best={score,fn}};
-    sheets.forEach((s,si)=>{
-      const canRow=s.usedH+(s.rows.length?g:0)+p.h<=HH+E;
-      for(const r of s.rows){
-        if(p.h>r.h+E) continue;
-        for(const c of r.cols){
-          if(Math.abs(p.w-c.w)<E && c.usedH+(c.n?g:0)+p.h<=r.h+E){
-            const waste=(c.w-p.w)*p.h;
-            cand(si*1e9+waste,()=>put(s,r,c,p));
-          }
-        }
-        if(r.usedW+(r.cols.length?g:0)+p.w<=W+E){
-          const waste=(r.h-p.h)*p.w;
-          const ok=(r.h-p.h)<=0.2*r.h+E || !canRow;
-          if(ok) cand(si*1e9+1e6+waste,()=>{const c=newCol(r,p.w);put(s,r,c,p)});
-        }
-      }
-      if(canRow) cand(si*1e9+5e8,()=>{const r=newRow(s,p.h);const c=newCol(r,p.w);put(s,r,c,p)});
-    });
-    if(!best){const s={rows:[],usedH:0,items:[]};sheets.push(s);const r=newRow(s,p.h);const c=newCol(r,p.w);put(s,r,c,p)}
-    else best.fn();
+    sheets.forEach((s,si)=>s.free.forEach((r,ri)=>{
+      if(p.w<=r.w+E&&p.h<=r.h+E){const score=si*1e12+r.w*r.h-p.w*p.h;if(!best||score<best.score)best={s,ri,r,score}}
+    }));
+    if(!best){const s={items:[],free:[{x:o.margin,y:o.margin,w:W,h:H}]};sheets.push(s);best={s,ri:0,r:s.free[0]}}
+    const {s,r,ri}=best;s.free.splice(ri,1);p.x=r.x;p.y=r.y;s.items.push(p);
+    // Full horizontal cut first, then a vertical cut in the occupied strip.
+    const right={x:r.x+p.w+g,y:r.y,w:r.w-p.w-g,h:p.h};
+    const below={x:r.x,y:r.y+p.h+g,w:r.w,h:r.h-p.h-g};
+    for(const f of [right,below])if(f.w>E&&f.h>E)s.free.push(f);
   }
   return {pages:sheets.map(s=>s.items),bad,sheets};
 }
-
+function logoBox(p){
+  const k=safeDiameter(p)/(2*(p.logo.r||Math.hypot(p.logo.w,p.logo.h)/2));
+  const w=p.logo.w*k,h=p.logo.h*k;
+  return {x:p.x+(p.w-w)/2,y:p.y+(p.h-h)/2,w,h};
+}
+// Decode locally and trim empty/white outer pixels before fitting; no image is uploaded.
+async function readLogo(file){
+  if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Wybierz plik PNG, JPG lub WebP.');
+  if(file.size>15*1024*1024)throw Error('Logo może mieć maksymalnie 15 MB.');
+  const url=URL.createObjectURL(file),img=new Image();
+  try{img.src=url;await img.decode();
+    const scale=Math.min(1,1200/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,c.width,c.height);
+    const {data}=ctx.getImageData(0,0,c.width,c.height);let x0=c.width,y0=c.height,x1=-1,y1=-1;
+    for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++){const i=(y*c.width+x)*4;if(data[i+3]>16&&Math.min(data[i],data[i+1],data[i+2])<248){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}}
+    if(x1<0)throw Error('Nie znaleziono widocznego logo w tym pliku.');
+    const w=x1-x0+1,h=y1-y0+1,out=document.createElement('canvas');const k=Math.min(1,800/Math.max(w,h));out.width=Math.max(1,Math.round(w*k));out.height=Math.max(1,Math.round(h*k));out.getContext('2d').drawImage(c,x0,y0,w,h,0,0,out.width,out.height);
+    const pixels=out.getContext('2d').getImageData(0,0,out.width,out.height).data;let radius=0;for(let y=0;y<out.height;y++)for(let x=0;x<out.width;x++){const i=(y*out.width+x)*4;if(pixels[i+3]>16)radius=Math.max(radius,Math.hypot(Math.abs(x+0.5-out.width/2)+0.5,Math.abs(y+0.5-out.height/2)+0.5));}
+    const logo={data:out.toDataURL('image/png'),w:out.width,h:out.height,r:radius};if(!validLogo(logo))throw Error('Plik jest zbyt szczegółowy. Wybierz mniejsze logo.');return logo;
+  }finally{URL.revokeObjectURL(url)}
+}
 /* ---------- step 1: cards ---------- */
 const colorBtn=c=>`<button type="button" class="btn boldt ic colbtn" data-act="color" aria-label="Kolor liter" title="Kolor liter"><span class="ai">A<span class="bar" style="background:${c||'#000000'}"></span></span></button>`;
 function lineRow(p,li){
@@ -265,7 +273,7 @@ function cardHtml(p){
   const i=idxOf(p);
   return `<article class="plate" id="card-${p.id}" data-id="${p.id}" aria-label="${itemName(p)} ${i}">
     <div class="plate-h">
-      <h3 class="plate-title">${itemName(p)} ${i}</h3>
+      <h3 class="plate-title">${itemName(p)} ${i}${p.logo?' · logo / rewers':''}</h3>
       <div class="dims ${p.shape==='medal'?'medal-dims':''}">
         ${p.shape==='medal'?`<label class="f"><span>Średnica (mm)</span><select data-act="diameter" aria-label="Średnica medalu">${MEDAL_SIZES.map(d=>`<option value="${d}" ${d===p.w?'selected':''}>${d} mm</option>`).join('')}</select></label>`:`
         <label class="f n"><span>Szerokość (mm)</span><input type="number" inputmode="decimal" step="0.5" min="1" id="w-${p.id}" value="${p.w}" data-act="w"></label>
@@ -274,11 +282,12 @@ function cardHtml(p){
         <label class="f n"><span>Liczba sztuk</span><input type="number" inputmode="numeric" step="1" min="1" id="c-${p.id}" value="${p.copies}" data-act="copies"></label>
       </div>
     </div>
-    <div class="lines">
+    ${p.shape==='medal'?`<div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Automatyczne dopasowanie do bezpiecznego obszaru.':'Dodaj osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div>`:''}
+    <div class="lines" ${p.logo?'hidden':''}>
       <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Puste pole rozmiaru = Auto. Wpisz wartość, aby powiększyć lub pomniejszyć linię. Przycisk Auto przywraca dopasowanie.</p>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
     </div>
-    <div class="foot">
+    <div class="foot" ${p.logo?'hidden':''}>
       <label class="f" for="f-${p.id}"><span>Dolny napis (opcjonalnie, kursywą)</span></label>
       <div class="footrow" data-li="foot">
         ${p.shape==='medal'?`<textarea id="f-${p.id}" rows="2" placeholder="Miejscowość&#10;Data" data-act="footer" aria-describedby="footer-help-${p.id}"${p.footerColor?` style="color:${p.footerColor}"`:''}>${esc(p.footer||'')}</textarea>`:`<input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>`}
@@ -288,7 +297,7 @@ function cardHtml(p){
     </div>
     <div class="plate-warn" data-warn hidden></div>
     <div class="row">
-      <button type="button" class="btn" data-act="add-line">Dodaj linię</button>
+      <button type="button" class="btn" data-act="add-line" ${p.logo?'hidden':''}>Dodaj linię</button>
       <button type="button" class="btn" data-act="dup">Duplikuj</button>
       ${p.shape==='medal'?'<button type="button" class="btn" data-act="fill-sheet">Zapełnij całą kartkę</button>':''}
       <button type="button" class="btn danger" data-act="del">Usuń ${p.shape==='medal'?'medal':'blaszkę'}</button>
@@ -308,6 +317,15 @@ $('cards').addEventListener('input',e=>{
   else if(act==='footer'){p.footer=e.target.value}
   changed();
 });
+$('cards').addEventListener('change',async e=>{
+  if(e.target.dataset.act!=='logo-file')return;
+  const input=e.target,p=byId(input.closest('.plate').dataset.id),file=input.files[0];if(!file)return;
+  try{const logo=await readLogo(file);if(!plates.includes(p))return;
+    if(p.logo){p.logo=logo;rerenderCard(p);changed()}
+    else{const back=mk({shape:'medal',w:p.w,copies:p.copies,logo,lines:[]});plates.splice(plates.indexOf(p)+1,0,back);renderCards();changed();flash(back,true)}
+    toast('Logo dopasowane. Rewers jest osobnym elementem do wydruku.');
+  }catch(err){toast(err.message||'Nie udało się odczytać logo. Spróbuj innego pliku.')}finally{input.value=''}
+});
 $('cards').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.dataset.act==='text'){
     e.preventDefault(); const card=e.target.closest('.plate'); const p=byId(card.dataset.id); const li=+e.target.closest('.line').dataset.li;
@@ -318,6 +336,7 @@ $('cards').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return; const card=b.closest('.plate'); if(!card) return;
   const p=byId(card.dataset.id); const act=b.dataset.act;
   if(['font-sans','font-serif','font-charm','font-vibes'].includes(act)){const li=+b.closest('.line').dataset.li;p.lines[li].font=fontKey(act.slice(5));b.closest('.line-toolbar').querySelectorAll('.font-choice').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));loadFamily(p.lines[li].font).catch(()=>{});changed();return}
+  if(act==='add-logo'){card.querySelector('[data-act=logo-file]').click();return}
   if(act==='fill-sheet'){
     const o=opts(),g=Math.max(0,o.gap);
     const cols=Math.floor((PAGE_W-2*o.margin+g)/(p.w+g)),rows=Math.floor((PAGE_H-2*o.margin+g)/(p.h+g));
@@ -402,7 +421,7 @@ function showTab(which){
   if(form) renderCards(); else $('src').value=toText();
 }
 $('tab-form').onclick=()=>showTab('form'); $('tab-paste').onclick=()=>showTab('paste');
-$('src').addEventListener('input',()=>{plates=fromText($('src').value);changed()});
+$('src').addEventListener('input',()=>{plates=[...fromText($('src').value),...plates.filter(p=>p.logo)];changed()});
 
 /* ---------- toast ---------- */
 function toast(text,undo){
@@ -418,7 +437,7 @@ function build(){
   if(!measurer) return;
   const o=opts();
   const items=[];
-  plates.forEach((p,i)=>{for(let c=0;c<Math.max(1,p.copies||1);c++) items.push({src:p,shape:p.shape,nr:i+1,w:p.w,h:p.h,pt:p.pt,lines:p.lines,footer:p.footer,footerColor:p.footerColor})});
+  plates.forEach((p,i)=>{for(let c=0;c<Math.max(1,p.copies||1);c++) items.push({src:p,shape:p.shape,logo:p.logo,nr:i+1,w:p.w,h:p.h,pt:p.pt,lines:p.lines,footer:p.footer,footerColor:p.footerColor})});
   items.forEach(it=>fit(it,o));
   layout={o,items,...pack(items,o)};
   renderPreview(); applyWarns();
@@ -430,6 +449,7 @@ function sheetSvg(i){
     s+=`<g class="pl" data-id="${p.src.id}">`;
     const border=`class="box" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${Math.max(o.stroke,0.18)}"`;
     s+=p.shape==='medal'?`<circle ${border} cx="${p.x+p.w/2}" cy="${p.y+p.h/2}" r="${p.w/2}"/>`:`<rect ${border} x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"/>`;
+    if(p.logo){const b=logoBox(p);s+=`<image href="${p.logo.data}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`;}
     if(p.fs) for(const l of linePos(p,o)) s+=`<text x="${l.x}" y="${l.y}" text-anchor="middle" font-family="${fontCss(l)}" font-weight="${fontStyle(l)==='bold'?700:400}"${l.font==='vibes'&&l.bold?` stroke="${l.color||'#000000'}" stroke-width="${l.size*PT*0.018}" paint-order="stroke fill"`:''} font-size="${l.size*PT}" fill="${l.color||'#000000'}"${l.italic?` transform="translate(${l.x} ${l.y}) skewX(-12) translate(${-l.x} ${-l.y})"`:''}>${esc(l.text)}</text>`;
     s+=`</g>`;
   }
@@ -485,6 +505,7 @@ function makePdfDoc(){
     doc.setDrawColor(...rgb); doc.setLineWidth(o.stroke); doc.setTextColor(0,0,0);
     for(const p of pg){
       if(o.stroke>0){if(p.shape==='medal')doc.circle(p.x+p.w/2,p.y+p.h/2,p.w/2,'S');else doc.rect(p.x,p.y,p.w,p.h,'S');}
+      if(p.logo){const b=logoBox(p);doc.addImage(p.logo.data,'PNG',b.x,b.y,b.w,b.h,undefined,'FAST');}
       if(p.fs) for(const l of linePos(p,o)){
         doc.setFont(fontName(l),fontStyle(l));doc.setFontSize(l.size);
         const c=l.color||'#000000';doc.setTextColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16));
@@ -565,5 +586,6 @@ function init(){
   let tries=0;(function hook(){if(window.claude&&window.claude.use){window.claude.use('downloads').then(d=>{downloads=d}).catch(()=>{});return}if(++tries<10)setTimeout(hook,300)})();
 }
 init();
+
 
 
