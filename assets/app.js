@@ -51,7 +51,9 @@ const fontStyle=l=>l.bold&&l.font!=='vibes'?'bold':'normal';
 const ascent=l=>l.font==='vibes'?1.1:l.font==='charm'?0.95:0.72;
 const descent=l=>l.font==='vibes'?0.5:l.font==='charm'?0.35:0.22;
 const lineStep=(prev,next,a,b,o)=>Math.max(0.22*a+(o.lh-0.22)*b,descent(prev)*a+(ascent(next)+0.15)*b)+next.gap*(b/next.scale);
-const mk=p=>({id:uid++,w:p.w,h:p.h,copies:p.copies||1,pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
+const MEDAL_SIZES=[27,41,52];
+const itemName=p=>p.shape==='medal'?'Medal':'Blaszka';
+const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
 let plates=[];
 const KEY='blaszki-state-v3';
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(plates.map(({id,...r})=>r)));localStorage.setItem(KEY+'-options',JSON.stringify(opts()));$('save-status').textContent='Zapisano w przeglądarce'}catch(e){$('save-status').textContent='Nie udało się zapisać danych'}}
@@ -93,6 +95,8 @@ function readMarks(str){
 }
 const SIZE_RE=/^\s*(\d+(?:[.,]\d+)?)\s*([x×X*\/])\s*(\d+(?:[.,]\d+)?)\s*(mm|cm)?(.*)$/i;
 function parseSize(s){
+  const medal=s.match(/^\s*medal\s+(27|41|52)\s*(?:mm)?(?:\s+(\d+)\s*szt)?(?:\s+(\d+(?:[.,]\d+)?)\s*pt)?\s*$/i);
+  if(medal)return {shape:'medal',w:+medal[1],h:+medal[1],copies:+medal[2]||1,pt:medal[3]?num(medal[3]):null};
   const m=s.match(SIZE_RE); if(!m) return null;
   const rest=m[5]||'';
   if(rest.trim() && !/^(\s*(\d+\s*szt\.?|x\s*\d+|\d+(?:[.,]\d+)?\s*pt))*\s*$/i.test(rest)) return null;
@@ -130,7 +134,7 @@ const colorTag=c=>c&&c!=='#000000'?`[${colorName(c)||c}]`:'';
 const sizeTag=v=>v?`[${String(v).replace('.',',')}pt]`:'';
 const fontTag=f=>({serif:'[times]',charm:'[charm]',vibes:'[vibes]'})[fontKey(f)]||'';
 function toText(){
-  return plates.map(p=>[`${p.w}x${p.h}`+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
+  return plates.map(p=>[(p.shape==='medal'?`medal ${p.w}mm`:`${p.w}x${p.h}`)+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
     ...p.lines.map(l=>(l.bold?'*':'')+(l.italic?'_':'')+colorTag(l.color)+sizeTag(l.size)+fontTag(l.font)+l.text),
     ...(p.footer?['@'+colorTag(p.footerColor)+p.footer]:[])].join('\n')).join('\n\n');
 }
@@ -160,16 +164,27 @@ function fit(p,o){
   const sizes=base=>lines.map(l=>lineSize(l.size)||base*l.scale);
   const height=ss=>ascent(lines[0])*ss[0]+descent(lines[n-1])*ss[n-1]+ss.slice(1).reduce((sum,z,i)=>sum+lineStep(lines[i],lines[i+1],ss[i],z,o),0);
   const width=ss=>Math.max(...lines.map((l,i)=>textW(l.text,l.bold,ss[i],l.italic,l.font)));
+  const circleFits=(ss,padding)=>{
+    if(p.shape!=='medal')return true;
+    const r=Math.max(0,p.w/2-padding), block=height(ss)*PT;
+    let y=-block/2+ascent(lines[0])*ss[0]*PT;
+    return lines.every((l,i)=>{
+      if(i)y+=lineStep(lines[i-1],l,ss[i-1],ss[i],o)*PT;
+      const edge=Math.max(Math.abs(y-ascent(l)*ss[i]*PT),Math.abs(y+descent(l)*ss[i]*PT));
+      const chord=edge<r?2*Math.sqrt(r*r-edge*edge):0;
+      return textW(l.text,l.bold,ss[i],l.italic,l.font)<=chord;
+    });
+  };
   let fs=p.pt;
   if(!fs){
     let lo=0,hi=o.max;
-    for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH)lo=mid;else hi=mid}
+    for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH&&circleFits(ss,Math.max(o.padx,o.pady)))lo=mid;else hi=mid}
     fs=Math.max(0.1,Math.floor(lo*10+1e-7)/10);
   }
   const ss=sizes(fs);
   lines.forEach((l,i)=>l.size=ss[i]);
   p.fs=fs;p.blockH=height(ss)*PT;
-  p.overflow=Math.min(...ss)<4.5||width(ss)>p.w-0.6||p.blockH>p.h-0.6;
+  p.overflow=Math.min(...ss)<4.5||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,0.3);
   p.small=!p.overflow&&Math.min(...ss)<6;
 }
 function linePos(p,o){
@@ -218,7 +233,7 @@ const colorBtn=c=>`<button type="button" class="btn boldt ic colbtn" data-act="c
 function lineRow(p,li){
   const l=p.lines[li];
   return `<div class="line" data-li="${li}"><label class="line-label" for="t-${p.id}-${li}">Linia ${li+1}</label>
-    <input type="text" id="t-${p.id}-${li}" class="${l.bold?'b':''}${l.italic?' i':''}" value="${esc(l.text)}" aria-label="Blaszka ${idxOf(p)}, linia ${li+1}" data-act="text"${l.color?` style="color:${l.color}"`:''}>
+    <input type="text" id="t-${p.id}-${li}" class="${l.bold?'b':''}${l.italic?' i':''}" value="${esc(l.text)}" aria-label="${itemName(p)} ${idxOf(p)}, linia ${li+1}" data-act="text"${l.color?` style="color:${l.color}"`:''}>
     <div class="tg line-toolbar" role="group" aria-label="Formatowanie linii ${li+1}">
       <button type="button" class="btn boldt ic" data-act="bold" aria-pressed="${l.bold}" aria-label="Pogrubienie" title="Pogrubienie"><span class="bi">B</span></button>
       <button type="button" class="btn boldt ic it" data-act="italic" aria-pressed="${l.italic}" aria-label="Kursywa" title="Kursywa"><span class="ii">I</span></button>
@@ -236,18 +251,19 @@ function lineRow(p,li){
 const idxOf=p=>plates.indexOf(p)+1;
 function cardHtml(p){
   const i=idxOf(p);
-  return `<article class="plate" id="card-${p.id}" data-id="${p.id}" aria-label="Blaszka ${i}">
+  return `<article class="plate" id="card-${p.id}" data-id="${p.id}" aria-label="${itemName(p)} ${i}">
     <div class="plate-h">
-      <h3 class="plate-title">Blaszka ${i}</h3>
-      <div class="dims">
+      <h3 class="plate-title">${itemName(p)} ${i}</h3>
+      <div class="dims ${p.shape==='medal'?'medal-dims':''}">
+        ${p.shape==='medal'?`<label class="f"><span>Średnica (mm)</span><select data-act="diameter" aria-label="Średnica medalu">${MEDAL_SIZES.map(d=>`<option value="${d}" ${d===p.w?'selected':''}>${d} mm</option>`).join('')}</select></label>`:`
         <label class="f n"><span>Szerokość (mm)</span><input type="number" inputmode="decimal" step="0.5" min="1" id="w-${p.id}" value="${p.w}" data-act="w"></label>
         <span class="times" aria-hidden="true">×</span>
-        <label class="f n"><span>Wysokość (mm)</span><input type="number" inputmode="decimal" step="0.5" min="1" id="h-${p.id}" value="${p.h}" data-act="h"></label>
+        <label class="f n"><span>Wysokość (mm)</span><input type="number" inputmode="decimal" step="0.5" min="1" id="h-${p.id}" value="${p.h}" data-act="h"></label>`}
         <label class="f n"><span>Liczba sztuk</span><input type="number" inputmode="numeric" step="1" min="1" id="c-${p.id}" value="${p.copies}" data-act="copies"></label>
       </div>
     </div>
     <div class="lines">
-      <div class="lines-label">Treść blaszki</div><p class="type-help" id="size-help-${p.id}">Puste pole rozmiaru = Auto. Wpisz wartość, aby powiększyć lub pomniejszyć linię. Przycisk Auto przywraca dopasowanie.</p>
+      <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Puste pole rozmiaru = Auto. Wpisz wartość, aby powiększyć lub pomniejszyć linię. Przycisk Auto przywraca dopasowanie.</p>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
     </div>
     <div class="foot">
@@ -255,13 +271,14 @@ function cardHtml(p){
       <div class="footrow" data-li="foot">
         <input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>
       </div>
-      <button type="button" class="btn small" data-act="footer-all">Wpisz to samo na wszystkich blaszkach</button>
+      <button type="button" class="btn small" data-act="footer-all">Wpisz to samo we wszystkich projektach</button>
     </div>
     <div class="plate-warn" data-warn hidden></div>
     <div class="row">
       <button type="button" class="btn" data-act="add-line">Dodaj linię</button>
       <button type="button" class="btn" data-act="dup">Duplikuj</button>
-      <button type="button" class="btn danger" data-act="del">Usuń blaszkę</button>
+      ${p.shape==='medal'?'<button type="button" class="btn" data-act="fill-sheet">Zapełnij całą kartkę</button>':''}
+      <button type="button" class="btn danger" data-act="del">Usuń ${p.shape==='medal'?'medal':'blaszkę'}</button>
     </div>
   </article>`;
 }
@@ -273,6 +290,7 @@ $('cards').addEventListener('input',e=>{
   if(act==='text'){p.lines[+e.target.closest('.line').dataset.li].text=e.target.value}
   else if(act==='line-size'){p.lines[+e.target.closest('.line').dataset.li].size=lineSize(e.target.value)}
   else if(act==='w'){p.w=num(e.target.value,0)} else if(act==='h'){p.h=num(e.target.value,0)}
+  else if(act==='diameter'&&MEDAL_SIZES.includes(+e.target.value)){p.w=p.h=+e.target.value}
   else if(act==='copies'){p.copies=Math.max(1,parseInt(e.target.value)||1)}
   else if(act==='footer'){p.footer=e.target.value}
   changed();
@@ -287,6 +305,13 @@ $('cards').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return; const card=b.closest('.plate'); if(!card) return;
   const p=byId(card.dataset.id); const act=b.dataset.act;
   if(['font-sans','font-serif','font-charm','font-vibes'].includes(act)){const li=+b.closest('.line').dataset.li;p.lines[li].font=fontKey(act.slice(5));b.closest('.line-toolbar').querySelectorAll('.font-choice').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));loadFamily(p.lines[li].font).catch(()=>{});changed();return}
+  if(act==='fill-sheet'){
+    const o=opts(),g=Math.max(0,o.gap);
+    const cols=Math.floor((PAGE_W-2*o.margin+g)/(p.w+g)),rows=Math.floor((PAGE_H-2*o.margin+g)/(p.h+g));
+    if(cols<1||rows<1){toast('Medal nie mieści się na kartce przy tych marginesach.');return}
+    p.copies=cols*rows;rerenderCard(p);changed();
+    toast(`Ustawiono ${p.copies} medali (${cols} × ${rows}) — pełna kartka tego wzoru. Inne projekty pozostają na liście.`);return;
+  }
   if(act==='line-auto'){const li=+b.closest('.line').dataset.li;p.lines[li].size=null;rerenderCard(p);changed();$('card-'+p.id).querySelectorAll('[data-act="line-size"]')[li].focus();return}
   if(act==='color'){const li=b.closest('[data-li]').dataset.li;openPop(b,p,li==='foot'?'foot':+li);return}
   if(act==='italic'){const li=+b.closest('.line').dataset.li;p.lines[li].italic=!p.lines[li].italic;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
@@ -306,9 +331,14 @@ function focusLine(p,li){const el=$(`t-${p.id}-${li}`);if(el)el.focus()}
 function flash(p,scroll){selectPlate(p.id);const el=$('card-'+p.id);if(!el)return;if(scroll)el.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});el.classList.add('flash');selectPlate(p.id)}
 
 $('add-plate').addEventListener('click',()=>{
-  const last=plates[plates.length-1];
+  const last=plates.filter(p=>p.shape!=='medal').at(-1);
   const p=mk({w:last?last.w:80,h:last?last.h:25,lines:[{text:'',bold:false}]});
   plates.push(p); renderCards(); changed(); flash(p,true); focusLine(p,0);
+});
+
+$('add-medal').addEventListener('click',()=>{
+  const p=mk({shape:'medal',w:27,h:27,lines:[{text:'',bold:false}]});
+  plates.push(p);renderCards();changed();flash(p,true);focusLine(p,0);
 });
 
 /* ---------- kolor liter (okienko) ---------- */
@@ -344,7 +374,7 @@ document.addEventListener('mousedown',e=>{if(popT&&!e.target.closest('#pop')&&!e
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&popT)closePop()});
 
 $('clear-all').addEventListener('click',()=>{
-  $('confirm-slot').innerHTML=`<div class="confirm"><span>Na pewno usunąć wszystkie blaszki?</span><button class="btn danger" id="yes-clear" type="button">Tak, usuń</button><button class="btn" id="no-clear" type="button">Anuluj</button></div>`;
+  $('confirm-slot').innerHTML=`<div class="confirm"><span>Na pewno usunąć wszystkie blaszki i medale?</span><button class="btn danger" id="yes-clear" type="button">Tak, usuń</button><button class="btn" id="no-clear" type="button">Anuluj</button></div>`;
   $('yes-clear').onclick=()=>{const old=plates;plates=[];renderCards();changed();$('confirm-slot').innerHTML='';toast('Usunięto wszystkie blaszki.',()=>{plates=old;renderCards();changed()})};
   $('no-clear').onclick=()=>{$('confirm-slot').innerHTML=''};
   $('no-clear').focus();
@@ -375,7 +405,7 @@ function build(){
   if(!measurer) return;
   const o=opts();
   const items=[];
-  plates.forEach((p,i)=>{for(let c=0;c<Math.max(1,p.copies||1);c++) items.push({src:p,nr:i+1,w:p.w,h:p.h,pt:p.pt,lines:p.lines,footer:p.footer,footerColor:p.footerColor})});
+  plates.forEach((p,i)=>{for(let c=0;c<Math.max(1,p.copies||1);c++) items.push({src:p,shape:p.shape,nr:i+1,w:p.w,h:p.h,pt:p.pt,lines:p.lines,footer:p.footer,footerColor:p.footerColor})});
   items.forEach(it=>fit(it,o));
   layout={o,items,...pack(items,o)};
   renderPreview(); applyWarns();
@@ -384,7 +414,9 @@ function sheetSvg(i){
   const {o,pages}=layout; const rgb=o.color; const pg=pages[i];
   let s=`<svg viewBox="0 0 ${PAGE_W} ${PAGE_H}" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Kartka ${i+1}">`;
   for(const p of pg){
-    s+=`<g class="pl" data-id="${p.src.id}"><rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${Math.max(o.stroke,0.18)}"/>`;
+    s+=`<g class="pl" data-id="${p.src.id}">`;
+    const border=`class="box" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${Math.max(o.stroke,0.18)}"`;
+    s+=p.shape==='medal'?`<circle ${border} cx="${p.x+p.w/2}" cy="${p.y+p.h/2}" r="${p.w/2}"/>`:`<rect ${border} x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"/>`;
     if(p.fs) for(const l of linePos(p,o)) s+=`<text x="${l.x}" y="${l.y}" text-anchor="middle" font-family="${fontCss(l)}" font-weight="${fontStyle(l)==='bold'?700:400}"${l.font==='vibes'&&l.bold?` stroke="${l.color||'#000000'}" stroke-width="${l.size*PT*0.018}" paint-order="stroke fill"`:''} font-size="${l.size*PT}" fill="${l.color||'#000000'}"${l.italic?` transform="translate(${l.x} ${l.y}) skewX(-12) translate(${-l.x} ${-l.y})"`:''}>${esc(l.text)}</text>`;
     s+=`</g>`;
   }
@@ -439,7 +471,7 @@ function makePdfDoc(){
     if(i) doc.addPage('a4','portrait');
     doc.setDrawColor(...rgb); doc.setLineWidth(o.stroke); doc.setTextColor(0,0,0);
     for(const p of pg){
-      if(o.stroke>0) doc.rect(p.x,p.y,p.w,p.h,'S');
+      if(o.stroke>0){if(p.shape==='medal')doc.circle(p.x+p.w/2,p.y+p.h/2,p.w/2,'S');else doc.rect(p.x,p.y,p.w,p.h,'S');}
       if(p.fs) for(const l of linePos(p,o)){
         doc.setFont(fontName(l),fontStyle(l));doc.setFontSize(l.size);
         const c=l.color||'#000000';doc.setTextColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16));
@@ -481,9 +513,9 @@ $('dl').addEventListener('click',async()=>{
 /* ---------- interfejs ---------- */
 const icons={plus:'M12 5v14M5 12h14',copy:'M8 8h12v12H8zM16 8V4H4v12h4',trash:'M3 6h18M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7',download:'M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5',edit:'m4 16-1 5 5-1L20 7l-4-4zM14 5l5 5',clipboard:'M9 5H5v16h14V5h-4M9 3h6v4H9z',print:'M6 9V3h12v6M6 17H3V9h18v8h-3M6 14h12v7H6z'};
 function icon(name){return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[name]}" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
-function decorate(){document.querySelectorAll('[data-act],#add-plate,#clear-all,#dl,#tab-form,#tab-paste').forEach(b=>{if(b.dataset.decorated)return;const a=b.dataset.act||b.id;if(b.closest('.line-toolbar')){if(a==='bold')b.innerHTML='<span class="bi">B</span>';else if(a==='italic')b.innerHTML='<span class="ii">I</span>';else if(a==='del-line')b.innerHTML=icon('trash');b.dataset.decorated='true';return}const m={'add-plate':['plus','Dodaj blaszkę'],'clear-all':['trash','Wyczyść listę'],'dl':['download','Pobierz PDF'],'tab-form':['edit','Wpisuję po kolei'],'tab-paste':['clipboard','Wklejam gotowy tekst'],'add-line':['plus','Dodaj linię'],'dup':['copy','Duplikuj'],'del':['trash','Usuń'],'del-line':['trash','Usuń linię']};if(m[a])b.innerHTML=icon(m[a][0])+(a==='tab-form'||a==='tab-paste'?'<span class="tab-label">'+m[a][1]+'</span>':m[a][1]);else if(a==='bold')b.innerHTML='<span class="bi">B</span> Pogrub';else if(a==='italic')b.innerHTML='<span class="ii">I</span> Kursywa';else if(a==='color')b.insertAdjacentHTML('beforeend',' Kolor');b.dataset.decorated='true'})}
+function decorate(){document.querySelectorAll('[data-act],#add-plate,#add-medal,#clear-all,#dl,#tab-form,#tab-paste').forEach(b=>{if(b.dataset.decorated)return;const a=b.dataset.act||b.id;if(b.closest('.line-toolbar')){if(a==='bold')b.innerHTML='<span class="bi">B</span>';else if(a==='italic')b.innerHTML='<span class="ii">I</span>';else if(a==='del-line')b.innerHTML=icon('trash');b.dataset.decorated='true';return}const m={'add-plate':['plus','Dodaj blaszkę'],'add-medal':['plus','Dodaj medal'],'clear-all':['trash','Wyczyść listę'],'dl':['download','Pobierz PDF'],'tab-form':['edit','Wpisuję po kolei'],'tab-paste':['clipboard','Wklejam gotowy tekst'],'add-line':['plus','Dodaj linię'],'dup':['copy','Duplikuj'],'del':['trash','Usuń'],'del-line':['trash','Usuń linię']};if(m[a])b.innerHTML=icon(m[a][0])+(a==='tab-form'||a==='tab-paste'?'<span class="tab-label">'+m[a][1]+'</span>':m[a][1]);else if(a==='bold')b.innerHTML='<span class="bi">B</span> Pogrub';else if(a==='italic')b.innerHTML='<span class="ii">I</span> Kursywa';else if(a==='color')b.insertAdjacentHTML('beforeend',' Kolor');b.dataset.decorated='true'})}
 function selectPlate(id){selectedId=id===null?null:+id;document.querySelectorAll('.plate').forEach(el=>el.classList.toggle('flash',+el.dataset.id===selectedId));document.querySelectorAll('#sheets .pl').forEach(el=>{el.classList.toggle('selected',+el.dataset.id===selectedId);el.setAttribute('aria-pressed',String(+el.dataset.id===selectedId))})}
-function updateWorkspace(){if(!layout)return;const n=layout.pages.length;currentPage=Math.max(0,Math.min(currentPage,n-1));[...$('sheets').children].forEach((el,i)=>el.hidden=n>0&&i!==currentPage);$('page-count').textContent=n?`${currentPage+1} / ${n}`:'Brak kartek';$('prev-page').disabled=currentPage<=0;$('page-nav').hidden=n<2;$('next-page').disabled=currentPage>=n-1;$('summary').innerHTML=`<span class="stat"><b>${plates.length}</b> ${plural(plates.length,'projekt','projekty','projektów')}</span><span class="stat"><b>${layout.items.length}</b> ${plural(layout.items.length,'sztuka','sztuki','sztuk')}</span><span class="stat"><b>${n}</b> ${plural(n,'kartka','kartki','kartek')} A4</span>`;document.querySelectorAll('#sheets .pl').forEach(g=>{g.setAttribute('tabindex','0');g.setAttribute('role','button');g.setAttribute('aria-label',`Edytuj blaszkę ${idxOf(byId(g.dataset.id))}`)});selectPlate(selectedId);decorate()}
+function updateWorkspace(){if(!layout)return;const n=layout.pages.length;currentPage=Math.max(0,Math.min(currentPage,n-1));[...$('sheets').children].forEach((el,i)=>el.hidden=n>0&&i!==currentPage);$('page-count').textContent=n?`${currentPage+1} / ${n}`:'Brak kartek';$('prev-page').disabled=currentPage<=0;$('page-nav').hidden=n<2;$('next-page').disabled=currentPage>=n-1;$('summary').innerHTML=`<span class="stat"><b>${plates.length}</b> ${plural(plates.length,'projekt','projekty','projektów')}</span><span class="stat"><b>${layout.items.length}</b> ${plural(layout.items.length,'sztuka','sztuki','sztuk')}</span><span class="stat"><b>${n}</b> ${plural(n,'kartka','kartki','kartek')} A4</span>`;document.querySelectorAll('#sheets .pl').forEach(g=>{g.setAttribute('tabindex','0');g.setAttribute('role','button');g.setAttribute('aria-label',`Edytuj ${byId(g.dataset.id).shape==='medal'?'medal':'blaszkę'} ${idxOf(byId(g.dataset.id))}`)});selectPlate(selectedId);decorate()}
 $('prev-page').onclick=()=>{currentPage--;updateWorkspace()};$('next-page').onclick=()=>{currentPage++;updateWorkspace()};
 $('cards').addEventListener('focusin',e=>{const c=e.target.closest('.plate');if(c)selectPlate(c.dataset.id)});
 $('sheets').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('.pl')){e.preventDefault();e.target.dispatchEvent(new MouseEvent('click',{bubbles:true}));const p=byId(e.target.closest('.pl').dataset.id);focusLine(p,0)}});
@@ -520,3 +552,4 @@ function init(){
   let tries=0;(function hook(){if(window.claude&&window.claude.use){window.claude.use('downloads').then(d=>{downloads=d}).catch(()=>{});return}if(++tries<10)setTimeout(hook,300)})();
 }
 init();
+
