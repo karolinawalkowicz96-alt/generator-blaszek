@@ -125,7 +125,7 @@ function fromText(text){
     let footer='',footerColor=null;const out=[];
     for(const raw of lines){
       const r=readMarks(raw); if(!r.text) continue;
-      if(r.foot){footer=r.text;footerColor=r.color} else out.push({text:r.text,bold:r.bold,italic:r.italic,color:r.color,size:r.size,font:r.font});
+      if(r.foot){footer=size.shape==='medal'&&footer?footer+'\n'+r.text:r.text;footerColor=r.color} else out.push({text:r.text,bold:r.bold,italic:r.italic,color:r.color,size:r.size,font:r.font});
     }
     return mk({...size,footer,footerColor,lines:out});
   });
@@ -136,7 +136,7 @@ const fontTag=f=>({serif:'[times]',charm:'[charm]',vibes:'[vibes]'})[fontKey(f)]
 function toText(){
   return plates.map(p=>[(p.shape==='medal'?`medal ${p.w}mm`:`${p.w}x${p.h}`)+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
     ...p.lines.map(l=>(l.bold?'*':'')+(l.italic?'_':'')+colorTag(l.color)+sizeTag(l.size)+fontTag(l.font)+l.text),
-    ...(p.footer?['@'+colorTag(p.footerColor)+p.footer]:[])].join('\n')).join('\n\n');
+    ...(p.footer?p.footer.split('\n').map(t=>'@'+colorTag(p.footerColor)+t):[])].join('\n')).join('\n\n');
 }
 
 /* ---------- pdf / metrics ---------- */
@@ -157,11 +157,15 @@ function opts(){
 }
 function fit(p,o){
   const lines=p.lines.filter(l=>l.text.trim()).map(l=>({...l,scale:1,gap:0}));
-  if(p.footer&&p.footer.trim()) lines.push({text:p.footer.trim(),bold:false,italic:true,color:p.footerColor,scale:FOOT_SCALE,gap:lines.length?FOOT_GAP:0,footer:true});
+  if(p.footer&&p.footer.trim()){
+    const foot=p.shape==='medal'?p.footer.split('\n').map(t=>t.trim()).filter(Boolean):[p.footer.trim()];
+    foot.forEach((text,i)=>lines.push({text,bold:false,italic:true,color:p.footerColor,scale:FOOT_SCALE,gap:i?0:lines.length?(p.shape==='medal'?0.9:FOOT_GAP):0,footer:true}));
+  }
   p.vis=lines;
   const n=lines.length; if(!n||p.w<=0||p.h<=0){p.fs=0;p.overflow=false;p.small=false;return}
-  const availW=p.w-2*o.padx, availH=p.h-2*o.pady;
-  const sizes=base=>lines.map(l=>lineSize(l.size)||base*l.scale);
+  const medal=p.shape==='medal', inset=medal?Math.max(1,p.w*0.035):0;
+  const availW=p.w-2*(medal?inset:o.padx), availH=p.h-2*(medal?inset:o.pady);
+  const sizes=base=>lines.map(l=>lineSize(l.size)||(medal?Math.min(base*l.scale,availW/Math.max(0.001,textW(l.text,l.bold,1,l.italic,l.font))):base*l.scale));
   const height=ss=>ascent(lines[0])*ss[0]+descent(lines[n-1])*ss[n-1]+ss.slice(1).reduce((sum,z,i)=>sum+lineStep(lines[i],lines[i+1],ss[i],z,o),0);
   const width=ss=>Math.max(...lines.map((l,i)=>textW(l.text,l.bold,ss[i],l.italic,l.font)));
   const circleFits=(ss,padding)=>{
@@ -177,15 +181,15 @@ function fit(p,o){
   };
   let fs=p.pt;
   if(!fs){
-    let lo=0,hi=o.max;
-    for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH&&circleFits(ss,Math.max(o.padx,o.pady)))lo=mid;else hi=mid}
+    let lo=0,hi=medal?Math.max(o.max,p.w*0.55):o.max;
+    for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH&&circleFits(ss,medal?inset:Math.max(o.padx,o.pady)))lo=mid;else hi=mid}
     fs=Math.max(0.1,Math.floor(lo*10+1e-7)/10);
   }
   const ss=sizes(fs);
   lines.forEach((l,i)=>l.size=ss[i]);
   p.fs=fs;p.blockH=height(ss)*PT;
-  p.overflow=Math.min(...ss)<4.5||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,0.3);
-  p.small=!p.overflow&&Math.min(...ss)<6;
+  p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,0.3);
+  p.small=!medal&&!p.overflow&&Math.min(...ss)<6;
 }
 function linePos(p,o){
   const L=p.vis;
@@ -269,7 +273,8 @@ function cardHtml(p){
     <div class="foot">
       <label class="f" for="f-${p.id}"><span>Dolny napis (opcjonalnie, kursywą)</span></label>
       <div class="footrow" data-li="foot">
-        <input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>
+        ${p.shape==='medal'?`<textarea id="f-${p.id}" rows="2" placeholder="Miejscowość&#10;Data" data-act="footer" aria-describedby="footer-help-${p.id}"${p.footerColor?` style="color:${p.footerColor}"`:''}>${esc(p.footer||'')}</textarea>`:`<input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>`}
+        ${p.shape==='medal'?`<small id="footer-help-${p.id}" class="footer-help">Enter dodaje kolejną linię dolnego napisu.</small>`:''}
       </div>
       <button type="button" class="btn small" data-act="footer-all">Wpisz to samo we wszystkich projektach</button>
     </div>
@@ -317,7 +322,7 @@ $('cards').addEventListener('click',e=>{
   if(act==='italic'){const li=+b.closest('.line').dataset.li;p.lines[li].italic=!p.lines[li].italic;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
   else if(act==='footer-all'){
     const v=p.footer.trim(); const old=plates.map(q=>q.footer);
-    plates.forEach(q=>q.footer=v); renderCards(); changed(); flash(p,false);
+    plates.forEach(q=>q.footer=q.shape==='medal'?v:v.replace(/\n/g,', ')); renderCards(); changed(); flash(p,false);
     toast(v?`Wpisano „${v}” na wszystkich blaszkach.`:'Usunięto dolny napis ze wszystkich blaszek.',()=>{plates.forEach((q,i)=>q.footer=old[i]);renderCards();changed()});
   }
   else if(act==='bold'){const li=+b.closest('.line').dataset.li;p.lines[li].bold=!p.lines[li].bold;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
@@ -440,9 +445,9 @@ function applyWarns(){
   if(!layout) return;
   const msgs={};
   const add=(p,t)=>{(msgs[p.id]=msgs[p.id]||new Set()).add(t)};
-  layout.bad.forEach(it=>add(it.src,'Ta blaszka nie mieści się na kartce A4. Sprawdź wymiar.'));
+  layout.bad.forEach(it=>add(it.src,'Projekt nie mieści się na kartce A4. Sprawdź marginesy i wymiar.'));
   layout.items.forEach(it=>{
-    if(it.overflow) add(it.src,'Tekst się nie mieści. Zmniejsz rozmiar, wybierz Auto, skróć tekst albo powiększ blaszkę.');
+    if(it.overflow) add(it.src,'Tekst wychodzi poza obramowanie. Wybierz Auto, zmniejsz ręczny rozmiar lub podziel tekst na krótsze linie.');
     else if(it.small) add(it.src,`Litery wyjdą małe (${fmt(it.fs)} pt). Może warto skrócić tekst.`);
   });
   plates.forEach(p=>{
@@ -450,7 +455,7 @@ function applyWarns(){
     const m=msgs[p.id]; el.classList.toggle('has-warn',!!m); w.hidden=!m; w.textContent=m?[...m].join(' '):'';
   });
   const count=Object.keys(msgs).length;
-  $('warn-list').innerHTML=count?`<div class="msg err" style="margin:0 0 14px">${count===1?'1 blaszka wymaga':count+' '+plural(count,'blaszka wymaga','blaszki wymagają','blaszek wymaga')} poprawki. Jest zaznaczona na czerwono.</div>`:'';
+  $('warn-list').innerHTML=count?`<div class="msg err" style="margin:0 0 14px">${count===1?'1 projekt wymaga':count+' '+plural(count,'projekt wymaga','projekty wymagają','projektów wymaga')} poprawki. Jest zaznaczona na czerwono.</div>`:'';
 }
 
 /* Przelicza podgląd, gdy potrzebne czcionki są już wczytane. */
@@ -552,4 +557,5 @@ function init(){
   let tries=0;(function hook(){if(window.claude&&window.claude.use){window.claude.use('downloads').then(d=>{downloads=d}).catch(()=>{});return}if(++tries<10)setTimeout(hook,300)})();
 }
 init();
+
 
