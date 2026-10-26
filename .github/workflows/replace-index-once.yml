@@ -1,0 +1,60 @@
+name: One-time replace Generator index
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/replace-index-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  replace-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Replace index.html with corrected version
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          path = Path('index.html')
+          data = path.read_bytes()
+          expected_before = 'eb78aed05df639b9174e03de6ebd6f4e61221e62'
+          expected_after = '6bc91eb601430bc58c5fda3a8817694d4d9818c3'
+
+          before = hashlib.sha1(data).hexdigest()
+          if before != expected_before:
+              raise SystemExit(f'Unexpected index.html SHA1: {before}; refusing to modify')
+
+          text = data.decode('utf-8')
+          text = text.replace('.line input', '.line > input')
+
+          anchor = '@media (prefers-reduced-motion:no-preference){.plate{transition:border-color .2s,box-shadow .2s}}\n'
+          insert = '''\n/* Typography controls: inputs inside column labels must not inherit text-row flex sizing. */\n.line-type .f input,.line-type .f select{\n  flex:none;box-sizing:border-box;height:44px;min-height:44px;max-height:44px;\n}\n.line-type .btn{height:44px;min-height:44px;box-sizing:border-box;align-self:end}\n'''
+          if text.count(anchor) != 1:
+              raise SystemExit('Expected CSS anchor not found exactly once; refusing to modify')
+          text = text.replace(anchor, anchor + insert, 1)
+
+          out = text.encode('utf-8')
+          after = hashlib.sha1(out).hexdigest()
+          if after != expected_after:
+              raise SystemExit(f'Corrected file SHA1 mismatch: {after}; refusing to commit')
+          path.write_bytes(out)
+          print(f'index.html verified: {before} -> {after}')
+          PY
+
+      - name: Commit corrected index.html
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- index.html
+          git diff --cached --quiet && { echo "No change to commit"; exit 1; }
+          git commit -m "Replace index.html with corrected version"
+          git push origin HEAD:main
