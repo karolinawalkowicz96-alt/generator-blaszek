@@ -195,42 +195,10 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 .mk-inline{color:var(--accent);font-weight:700}
 @media(max-width:560px){.help-options>div{grid-template-columns:1fr}}
 .sheet{position:relative}
-.zoom-open{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px 0 10px;border-radius:999px;border:1px solid #cfd9e6;background:rgba(255,255,255,.94);color:var(--accent);font:600 13px/1 var(--f-ui);cursor:zoom-in;box-shadow:0 2px 10px rgba(28,44,66,.14);transition:background .15s,color .15s,border-color .15s,transform .15s}
-.zoom-open:hover{background:var(--accent);border-color:var(--accent);color:#fff}
-.zoom-open:active{transform:scale(.97)}
-.zoom-open:disabled{opacity:.45;cursor:default;background:#fff;color:var(--accent);border-color:#cfd9e6}
 .page-nav{flex-wrap:wrap}
-.page-nav .zoom-open{height:44px;padding:0 16px 0 13px;font-size:14px;margin-left:6px}
-.zoom-open svg{display:block;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
-.sheet svg{cursor:default}
+
 .hint.loading{color:var(--muted)}
-html.zoom-lock{overflow:hidden}
-.zoom{position:fixed;inset:0;margin:auto;width:calc(100vw - 40px);height:calc(100dvh - 40px);max-width:1400px;max-height:none;padding:0;border:0;border-radius:18px;background:#e6ecf3;color:var(--ink);overflow:hidden;box-shadow:0 24px 80px rgba(10,22,40,.35)}
-.zoom[open]{display:flex;flex-direction:column}
-.zoom::backdrop{background:rgba(15,27,45,.55);backdrop-filter:blur(2px)}
-.zoom-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px 10px 18px;background:#fff;border-bottom:1px solid #d7dfe9;flex:none}
-.zoom-left{display:flex;align-items:center;gap:6px;min-width:0}
-.zoom-left strong{font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
-.zoom-tools{display:flex;align-items:center;gap:2px;background:#edf1f6;border-radius:11px;padding:4px}
-.zbtn{display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:40px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--ink);font:600 21px/1 var(--f-ui);cursor:pointer}
-.zbtn:hover:not(:disabled){background:#fff;color:var(--accent)}
-.zbtn:disabled{opacity:.35;cursor:default}
-.zbtn.pct{min-width:62px;font-size:14px;font-variant-numeric:tabular-nums}
-.zbtn.text{font-size:14px;padding:0 12px}
-.zbtn[aria-pressed=true]{background:#fff;color:var(--accent);box-shadow:0 1px 4px #20305018}
-.zbtn.close{font-size:26px;font-weight:400;background:#f2f5f9}
-.zbtn.close:hover{background:#fdecec;color:#a12626}
-.zoom-view{position:relative;flex:1;min-height:0;overflow:hidden;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;background-color:#e6ecf3;background-image:radial-gradient(#cfd8e4 1px,transparent 1px);background-size:18px 18px}
-.zoom-view.dragging{cursor:grabbing}
-.zoom-canvas{position:absolute;left:0;top:0;background:#fff;box-shadow:0 2px 6px rgba(26,40,64,.08),0 14px 40px rgba(26,40,64,.18);will-change:transform}
-.zoom-canvas svg{display:block;width:100%;height:100%}
-.zoom-hint{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);margin:0;max-width:calc(100% - 32px);background:rgba(15,27,45,.84);color:#fff;font-size:13px;line-height:1.35;text-align:center;padding:8px 14px;border-radius:14px;pointer-events:none;transition:opacity .5s}
-.zoom-hint.gone{opacity:0}
-.zoom-hint .touch{display:none}
-@media(pointer:coarse){.zoom-hint .mouse{display:none}.zoom-hint .touch{display:inline}}
-@media(max-width:640px){.zoom{width:100vw;height:100dvh;border-radius:0}.zoom-bar{padding:8px;gap:6px}.zoom-left strong{font-size:14px}.zbtn{min-width:36px;height:38px}.zbtn.text{padding:0 8px;font-size:13px}.zbtn.pct{min-width:52px;font-size:13px}}
-@media(max-width:400px){.zbtn.text{display:none}}
-@media(prefers-reduced-motion:reduce){.zoom-hint,.zoom-open,.chip,.ex-line{transition:none}}
+@media(prefers-reduced-motion:reduce){.ex-line{transition:none}}
 .export{padding:14px 24px 16px!important}
 .adv{margin-top:0!important;border-top:0!important;padding-top:0!important}
 .adv>summary{list-style:none;display:inline-flex!important;align-items:center;gap:6px!important;min-height:36px!important;font-size:14px!important;font-weight:500!important;color:#7a8799;cursor:pointer;border-radius:6px;padding:0 4px;margin-left:-4px;transition:color .15s}
@@ -245,17 +213,11 @@ html.zoom-lock{overflow:hidden}
 .preview{padding-top:20px!important}
 .preview .step-h{margin-bottom:14px!important}
 .preview #dl{margin-bottom:12px}
-.pv-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px;margin:0 0 14px}
-.pv-meta .summary{margin:0}
-.pv-meta .chk{min-height:36px;font-size:14.5px;color:var(--ink)}
-.chk-note{color:var(--muted);font-size:13px}
 .sheets{padding:2px 0 0}
-.sheet{max-width:none!important;width:min(100%,max(420px,calc((100vh - 280px) * .7071)));margin:0 auto;border-radius:2px;box-shadow:0 1px 2px rgba(26,40,64,.06),0 10px 34px rgba(26,40,64,.16)!important}
+.sheet{max-width:none!important;width:min(100%,max(420px,calc((100vh - 275px) * .7071)));margin:0 auto;border-radius:2px;box-shadow:0 1px 2px rgba(26,40,64,.06),0 10px 34px rgba(26,40,64,.16)!important}
 .page-nav{margin-top:14px!important}
 @media(min-width:1101px){.right{max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
 @media(max-width:1100px){.sheet{width:min(100%,640px)}}
-.page-nav .chk{min-height:44px;margin:0 0 0 4px;padding:0 6px;font-size:14px}
-.page-nav .chk input{width:18px;height:18px}
 </style>
 </head>
 <body>
@@ -344,7 +306,7 @@ Kategoria: SENIOR
       <div class="step-h"><div class="num" aria-hidden="true">2</div><div><h2 id="h2s">Podgląd wydruku</h2><p>A4 · Kliknij blaszkę, aby ją edytować.</p></div></div>
       <button class="btn primary big" id="dl" type="button">Pobierz PDF</button>
       <div id="dl-msg"></div>
-      <p class="summary" id="summary" hidden></p><div id="warn-list"></div><div class="sheets" id="sheets"></div><div class="page-nav"><button class="btn" id="prev-page" type="button">Poprzednia</button><span id="page-count" aria-live="polite"></span><button class="btn" id="next-page" type="button">Następna</button><button type="button" class="zoom-open" id="zoom-btn" title="Powiększ podgląd (lub kliknij kartkę dwukrotnie)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21M10.5 7.5v6M7.5 10.5h6"/></svg><span>Powiększ</span></button><label class="chk" for="o-cuts" title="Linie cięcia widać tylko w podglądzie, nie ma ich w PDF."><input type="checkbox" id="o-cuts" checked> Linie cięcia <span class="chk-note">(tylko podgląd)</span></label></div>
+      <p class="summary" id="summary" hidden></p><div id="warn-list"></div><div class="sheets" id="sheets"></div><div class="page-nav" id="page-nav" hidden><button class="btn" id="prev-page" type="button">Poprzednia</button><span id="page-count" aria-live="polite"></span><button class="btn" id="next-page" type="button">Następna</button></div>
     </section>
 
     <!-- KROK 3 -->
@@ -369,26 +331,6 @@ Kategoria: SENIOR
 
 <footer class="site-credit">by Dawid Tokarski</footer>
 
-<dialog id="zoom" class="zoom" aria-labelledby="zoom-title">
-  <div class="zoom-bar">
-    <div class="zoom-left">
-      <button type="button" class="zbtn" id="zoom-prev" aria-label="Poprzednia kartka" title="Poprzednia kartka">‹</button>
-      <strong id="zoom-title">Podgląd kartki A4</strong>
-      <button type="button" class="zbtn" id="zoom-next" aria-label="Następna kartka" title="Następna kartka">›</button>
-    </div>
-    <div class="zoom-tools" role="group" aria-label="Powiększenie">
-      <button type="button" class="zbtn" id="zoom-out" aria-label="Pomniejsz" title="Pomniejsz (−)">−</button>
-      <button type="button" class="zbtn pct" id="zoom-pct" title="Rzeczywisty rozmiar (100%)" aria-label="Pokaż w rzeczywistym rozmiarze">100%</button>
-      <button type="button" class="zbtn" id="zoom-in" aria-label="Przybliż" title="Przybliż (+)">+</button>
-      <button type="button" class="zbtn text" id="zoom-fit" aria-pressed="true" title="Pokaż całą kartkę (0)">Cała kartka</button>
-    </div>
-    <button type="button" class="zbtn close" id="zoom-close" aria-label="Zamknij podgląd" title="Zamknij (Esc)">×</button>
-  </div>
-  <div class="zoom-view" id="zoom-view">
-    <div class="zoom-canvas" id="zoom-canvas"></div>
-    <p class="zoom-hint" id="zoom-hint"><span class="mouse">Kółko myszy — przybliżanie · Przeciągnij — przesuwanie · Dwuklik — szybkie przybliżenie</span><span class="touch">Rozsuń dwa palce, aby przybliżyć · Przeciągnij, aby przesunąć</span></p>
-  </div>
-</dialog>
 
 <div id="pop-slot"></div>
 <div id="toast-slot"></div>

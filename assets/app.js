@@ -380,17 +380,11 @@ function build(){
   layout={o,items,...pack(items,o)};
   renderPreview(); applyWarns();
 }
-function sheetSvg(i,forZoom){
-  const {o,pages,sheets}=layout; const rgb=o.color; const pg=pages[i];
-  const showCuts=$('o-cuts').checked;
+function sheetSvg(i){
+  const {o,pages}=layout; const rgb=o.color; const pg=pages[i];
   let s=`<svg viewBox="0 0 ${PAGE_W} ${PAGE_H}" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Kartka ${i+1}">`;
-  if(forZoom) s+=`<rect x="0" y="0" width="${PAGE_W}" height="${PAGE_H}" fill="#ffffff"/>`;
-  if(showCuts&&sheets&&sheets[i]){
-    const ys=new Set();sheets[i].rows.forEach(r=>{ys.add(+(o.margin+r.y).toFixed(3));ys.add(+(o.margin+r.y+r.h).toFixed(3))});
-    for(const y of ys) s+=`<line x1="0" x2="${PAGE_W}" y1="${y}" y2="${y}" stroke="#d62d20" stroke-width="${forZoom?0.25:0.35}" stroke-dasharray="2 1.2"/>`;
-  }
   for(const p of pg){
-    s+=`<g class="pl" data-id="${p.src.id}"><rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${forZoom?Math.max(o.stroke,0.1):Math.max(o.stroke,0.18)}"/>`;
+    s+=`<g class="pl" data-id="${p.src.id}"><rect class="box" x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${Math.max(o.stroke,0.18)}"/>`;
     if(p.fs) for(const l of linePos(p,o)) s+=`<text x="${l.x}" y="${l.y}" text-anchor="middle" font-family="${fontCss(l)}" font-weight="${fontStyle(l)==='bold'?700:400}"${l.font==='vibes'&&l.bold?` stroke="${l.color||'#000000'}" stroke-width="${l.size*PT*0.018}" paint-order="stroke fill"`:''} font-size="${l.size*PT}" fill="${l.color||'#000000'}"${l.italic?` transform="translate(${l.x} ${l.y}) skewX(-12) translate(${-l.x} ${-l.y})"`:''}>${esc(l.text)}</text>`;
     s+=`</g>`;
   }
@@ -398,11 +392,10 @@ function sheetSvg(i,forZoom){
 }
 function renderPreview(){
   const {pages}=layout;
-  $('sheets').innerHTML=pages.map((pg,i)=>`<div><div class="sheet-label">Kartka ${i+1} z ${pages.length}</div><div class="sheet" title="Kliknij dwukrotnie, aby powiększyć">${sheetSvg(i)}</div></div>`).join('')
+  $('sheets').innerHTML=pages.map((pg,i)=>`<div><div class="sheet-label">Kartka ${i+1} z ${pages.length}</div><div class="sheet">${sheetSvg(i)}</div></div>`).join('')
     || `<div class="hint">Tu pojawi się kartka z blaszkami, gdy wpiszesz pierwszą blaszkę.</div>`;
   $('dl').disabled=!pages.length;
   updateWorkspace();
-  if(zoom.open) zoomRender(false);
 }
 const plural=(n,a,b,c)=>n===1?a:(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20))?b:c;
 $('sheets').addEventListener('click',e=>{
@@ -410,8 +403,6 @@ $('sheets').addEventListener('click',e=>{
   if($('panel-form').hidden) showTab('form');
   flash(p,true);
 });
-$('sheets').addEventListener('dblclick',e=>{if(e.target.closest('.sheet')){e.preventDefault();openZoom(currentPage)}});
-$('zoom-btn').onclick=()=>openZoom(currentPage);
 
 function applyWarns(){
   if(!layout) return;
@@ -437,120 +428,7 @@ function refresh(){
   return Promise.all([ready,ensureFonts(usedFamilies())]).then(()=>{if(seq===buildSeq)build()}).catch(()=>{if(seq===buildSeq){if(measurer)build();say('err','Nie udało się wczytać czcionki. Sprawdź połączenie i odśwież stronę.')}});
 }
 function changed(){$('dl-msg').innerHTML='';$('save-status').textContent='Zapisywanie…';clearTimeout(t);t=setTimeout(()=>{persist();refresh()},180)}
-['o-margin','o-gap','o-padx','o-pady','o-max','o-lh','o-stroke','o-color','o-cuts'].forEach(id=>{$(id).addEventListener('input',changed);$(id).addEventListener('change',changed)});
-
-/* ---------- powiększenie podglądu ---------- */
-const MM=96/25.4;            // 100% = rzeczywisty rozmiar kartki na ekranie
-const zoom={open:false,page:0,s:1,fit:1,x:0,y:0,min:.2,max:6};
-const zv=()=>$('zoom-view'), zc=()=>$('zoom-canvas');
-function zoomApply(){
-  const c=zc(); const w=PAGE_W*MM*zoom.s, h=PAGE_H*MM*zoom.s;
-  const v=zv().getBoundingClientRect();
-  // nie pozwól „zgubić” kartki poza ekranem
-  const pad=40;
-  if(w<=v.width) zoom.x=(v.width-w)/2; else zoom.x=Math.min(pad,Math.max(v.width-w-pad,zoom.x));
-  if(h<=v.height) zoom.y=(v.height-h)/2; else zoom.y=Math.min(pad,Math.max(v.height-h-pad,zoom.y));
-  c.style.width=w+'px'; c.style.height=h+'px';
-  c.style.transform=`translate(${zoom.x}px,${zoom.y}px)`;
-  $('zoom-pct').textContent=Math.round(zoom.s*100)+'%';
-  $('zoom-out').disabled=zoom.s<=zoom.min+1e-3; $('zoom-in').disabled=zoom.s>=zoom.max-1e-3;
-  $('zoom-fit').setAttribute('aria-pressed',String(Math.abs(zoom.s-zoom.fit)<1e-3));
-}
-function zoomFitScale(){const v=zv().getBoundingClientRect();return Math.max(.05,Math.min((v.width-32)/(PAGE_W*MM),(v.height-32)/(PAGE_H*MM)))}
-function zoomTo(s,cx,cy){
-  const v=zv().getBoundingClientRect();
-  if(cx==null){cx=v.width/2;cy=v.height/2}
-  s=Math.min(zoom.max,Math.max(zoom.min,s));
-  const k=s/zoom.s; zoom.x=cx-(cx-zoom.x)*k; zoom.y=cy-(cy-zoom.y)*k; zoom.s=s; zoomApply();
-}
-function zoomFit(){zoom.fit=zoomFitScale();zoom.min=Math.min(.25,zoom.fit*.8);zoom.s=zoom.fit;zoom.x=0;zoom.y=0;zoomApply()}
-function zoomRender(reset){
-  const n=layout?layout.pages.length:0;
-  if(!n){closeZoom();return}
-  zoom.page=Math.max(0,Math.min(zoom.page,n-1));
-  zc().innerHTML=sheetSvg(zoom.page,true);
-  $('zoom-title').textContent=n>1?`Kartka ${zoom.page+1} z ${n}`:'Podgląd kartki A4';
-  $('zoom-prev').hidden=$('zoom-next').hidden=n<2;
-  $('zoom-prev').disabled=zoom.page<=0; $('zoom-next').disabled=zoom.page>=n-1;
-  if(reset) zoomFit(); else zoomApply();
-}
-function openZoom(page){
-  if(!layout||!layout.pages.length) return;
-  const d=$('zoom'); zoom.page=page; zoom.open=true;
-  if(d.showModal) d.showModal(); else d.setAttribute('open','');
-  document.documentElement.classList.add('zoom-lock');
-  zoomRender(true);
-  $('zoom-hint').classList.remove('gone');
-  $('zoom-close').focus();
-}
-function closeZoom(){const d=$('zoom');zoom.open=false;document.documentElement.classList.remove('zoom-lock');if(d.open){d.close?d.close():d.removeAttribute('open')}}
-$('zoom').addEventListener('close',()=>{zoom.open=false;document.documentElement.classList.remove('zoom-lock');$('zoom-btn').focus()});
-$('zoom').addEventListener('click',e=>{if(e.target===$('zoom'))closeZoom()});
-$('zoom-close').onclick=closeZoom;
-$('zoom-in').onclick=()=>zoomTo(zoom.s*1.25);
-$('zoom-out').onclick=()=>zoomTo(zoom.s/1.25);
-$('zoom-fit').onclick=zoomFit;
-$('zoom-pct').onclick=()=>zoomTo(1);
-$('zoom-prev').onclick=()=>{zoom.page--;currentPage=zoom.page;updateWorkspace();zoomRender(true)};
-$('zoom-next').onclick=()=>{zoom.page++;currentPage=zoom.page;updateWorkspace();zoomRender(true)};
-(function(){
-  const v=$('zoom-view'); const pts=new Map(); let start=null, moved=false;
-  const hideHint=()=>$('zoom-hint').classList.add('gone');
-  const local=e=>{const r=v.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top]};
-  v.addEventListener('wheel',e=>{
-    e.preventDefault(); hideHint();
-    const [cx,cy]=local(e);
-    // Kółko myszy i gest „szczypania” na touchpadzie przybliżają; przesuwanie dwoma palcami przesuwa kartkę.
-    const mouseWheel=e.deltaMode!==0||(e.deltaX===0&&Math.abs(e.deltaY)>=40&&Number.isInteger(e.deltaY));
-    if(e.ctrlKey||e.metaKey||mouseWheel){
-      let d=e.deltaMode===1?e.deltaY*33:e.deltaMode===2?e.deltaY*400:e.deltaY;
-      d=Math.max(-120,Math.min(120,d));
-      zoomTo(zoom.s*Math.exp(-d*(e.ctrlKey&&!mouseWheel?0.012:0.0025)),cx,cy);
-    } else {zoom.x-=e.deltaX;zoom.y-=e.deltaY;zoomApply()}
-  },{passive:false});
-  v.addEventListener('pointerdown',e=>{
-    if(e.button!==0&&e.pointerType==='mouse') return;
-    v.setPointerCapture(e.pointerId); pts.set(e.pointerId,local(e)); moved=false; hideHint();
-    start={x:zoom.x,y:zoom.y,s:zoom.s,pts:new Map(pts)}; v.classList.add('dragging');
-  });
-  v.addEventListener('pointermove',e=>{
-    if(!pts.has(e.pointerId)||!start) return;
-    pts.set(e.pointerId,local(e));
-    const cur=[...pts.values()], st=[...start.pts.values()];
-    if(cur.length>=2&&st.length>=2){
-      const dist=(a,b)=>Math.hypot(a[0]-b[0],a[1]-b[1]);
-      const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];
-      const s=Math.min(zoom.max,Math.max(zoom.min,start.s*dist(cur[0],cur[1])/Math.max(1,dist(st[0],st[1]))));
-      const m0=mid(st[0],st[1]), m1=mid(cur[0],cur[1]), k=s/start.s;
-      zoom.s=s; zoom.x=m1[0]-(m0[0]-start.x)*k; zoom.y=m1[1]-(m0[1]-start.y)*k; moved=true;
-    } else if(cur.length===1&&st.length===1){
-      const dx=cur[0][0]-st[0][0], dy=cur[0][1]-st[0][1];
-      if(Math.abs(dx)+Math.abs(dy)>3) moved=true;
-      zoom.x=start.x+dx; zoom.y=start.y+dy;
-    }
-    zoomApply();
-  });
-  const up=e=>{pts.delete(e.pointerId);start=pts.size?{x:zoom.x,y:zoom.y,s:zoom.s,pts:new Map(pts)}:null;if(!pts.size)v.classList.remove('dragging')};
-  v.addEventListener('pointerup',up); v.addEventListener('pointercancel',up);
-  v.addEventListener('dblclick',e=>{const [cx,cy]=local(e);hideHint();if(zoom.s<zoom.fit*1.6)zoomTo(Math.max(zoom.fit*2.5,1),cx,cy);else zoomFit()});
-  $('zoom').addEventListener('keydown',e=>{
-    if(e.target.closest&&e.target.closest('button')&&(e.key===' '||e.key==='Enter')) return;
-    const step=60; let h=true;
-    if(e.key==='+'||e.key==='=') zoomTo(zoom.s*1.25);
-    else if(e.key==='-'||e.key==='_') zoomTo(zoom.s/1.25);
-    else if(e.key==='0') zoomFit();
-    else if(e.key==='1') zoomTo(1);
-    else if(e.key==='ArrowLeft'){zoom.x+=step;zoomApply()}
-    else if(e.key==='ArrowRight'){zoom.x-=step;zoomApply()}
-    else if(e.key==='ArrowUp'){zoom.y+=step;zoomApply()}
-    else if(e.key==='ArrowDown'){zoom.y-=step;zoomApply()}
-    else if(e.key==='PageDown'&&!$('zoom-next').disabled&&!$('zoom-next').hidden) $('zoom-next').click();
-    else if(e.key==='PageUp'&&!$('zoom-prev').disabled&&!$('zoom-prev').hidden) $('zoom-prev').click();
-    else h=false;
-    if(h){e.preventDefault();hideHint()}
-  });
-  addEventListener('resize',()=>{if(!zoom.open)return;const wasFit=Math.abs(zoom.s-zoom.fit)<1e-3;zoom.fit=zoomFitScale();if(wasFit)zoomFit();else zoomApply()});
-})();
+['o-margin','o-gap','o-padx','o-pady','o-max','o-lh','o-stroke','o-color'].forEach(id=>{$(id).addEventListener('input',changed);$(id).addEventListener('change',changed)});
 
 /* ---------- step 3: download ---------- */
 function fileName(){const d=new Date();return `blaszki-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}.pdf`}
@@ -605,7 +483,7 @@ const icons={plus:'M12 5v14M5 12h14',copy:'M8 8h12v12H8zM16 8V4H4v12h4',trash:'M
 function icon(name){return `<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="${icons[name]}" stroke-linecap="round" stroke-linejoin="round"/></svg>`}
 function decorate(){document.querySelectorAll('[data-act],#add-plate,#clear-all,#dl,#tab-form,#tab-paste').forEach(b=>{if(b.dataset.decorated)return;const a=b.dataset.act||b.id;if(b.closest('.line-toolbar')){if(a==='bold')b.innerHTML='<span class="bi">B</span>';else if(a==='italic')b.innerHTML='<span class="ii">I</span>';else if(a==='del-line')b.innerHTML=icon('trash');b.dataset.decorated='true';return}const m={'add-plate':['plus','Dodaj blaszkę'],'clear-all':['trash','Wyczyść listę'],'dl':['download','Pobierz PDF'],'tab-form':['edit','Wpisuję po kolei'],'tab-paste':['clipboard','Wklejam gotowy tekst'],'add-line':['plus','Dodaj linię'],'dup':['copy','Duplikuj'],'del':['trash','Usuń'],'del-line':['trash','Usuń linię']};if(m[a])b.innerHTML=icon(m[a][0])+m[a][1];else if(a==='bold')b.innerHTML='<span class="bi">B</span> Pogrub';else if(a==='italic')b.innerHTML='<span class="ii">I</span> Kursywa';else if(a==='color')b.insertAdjacentHTML('beforeend',' Kolor');b.dataset.decorated='true'})}
 function selectPlate(id){selectedId=id===null?null:+id;document.querySelectorAll('.plate').forEach(el=>el.classList.toggle('flash',+el.dataset.id===selectedId));document.querySelectorAll('#sheets .pl').forEach(el=>{el.classList.toggle('selected',+el.dataset.id===selectedId);el.setAttribute('aria-pressed',String(+el.dataset.id===selectedId))})}
-function updateWorkspace(){if(!layout)return;const n=layout.pages.length;currentPage=Math.max(0,Math.min(currentPage,n-1));[...$('sheets').children].forEach((el,i)=>el.hidden=n>0&&i!==currentPage);$('page-count').textContent=n?`${currentPage+1} / ${n}`:'Brak kartek';$('prev-page').disabled=currentPage<=0;$('zoom-btn').disabled=!n;$('next-page').disabled=currentPage>=n-1;$('summary').innerHTML=`<span class="stat"><b>${plates.length}</b> ${plural(plates.length,'projekt','projekty','projektów')}</span><span class="stat"><b>${layout.items.length}</b> ${plural(layout.items.length,'sztuka','sztuki','sztuk')}</span><span class="stat"><b>${n}</b> ${plural(n,'kartka','kartki','kartek')} A4</span>`;document.querySelectorAll('#sheets .pl').forEach(g=>{g.setAttribute('tabindex','0');g.setAttribute('role','button');g.setAttribute('aria-label',`Edytuj blaszkę ${idxOf(byId(g.dataset.id))}`)});selectPlate(selectedId);decorate()}
+function updateWorkspace(){if(!layout)return;const n=layout.pages.length;currentPage=Math.max(0,Math.min(currentPage,n-1));[...$('sheets').children].forEach((el,i)=>el.hidden=n>0&&i!==currentPage);$('page-count').textContent=n?`${currentPage+1} / ${n}`:'Brak kartek';$('prev-page').disabled=currentPage<=0;$('page-nav').hidden=n<2;$('next-page').disabled=currentPage>=n-1;$('summary').innerHTML=`<span class="stat"><b>${plates.length}</b> ${plural(plates.length,'projekt','projekty','projektów')}</span><span class="stat"><b>${layout.items.length}</b> ${plural(layout.items.length,'sztuka','sztuki','sztuk')}</span><span class="stat"><b>${n}</b> ${plural(n,'kartka','kartki','kartek')} A4</span>`;document.querySelectorAll('#sheets .pl').forEach(g=>{g.setAttribute('tabindex','0');g.setAttribute('role','button');g.setAttribute('aria-label',`Edytuj blaszkę ${idxOf(byId(g.dataset.id))}`)});selectPlate(selectedId);decorate()}
 $('prev-page').onclick=()=>{currentPage--;updateWorkspace()};$('next-page').onclick=()=>{currentPage++;updateWorkspace()};
 $('cards').addEventListener('focusin',e=>{const c=e.target.closest('.plate');if(c)selectPlate(c.dataset.id)});
 $('sheets').addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('.pl')){e.preventDefault();e.target.dispatchEvent(new MouseEvent('click',{bubbles:true}));const p=byId(e.target.closest('.pl').dataset.id);focusLine(p,0)}});
