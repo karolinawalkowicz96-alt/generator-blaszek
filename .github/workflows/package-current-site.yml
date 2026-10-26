@@ -1,0 +1,24 @@
+name: Package current site
+
+on:
+  push:
+    paths:
+      - '.github/workflows/package-current-site.yml'
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Upload current site files
+        uses: actions/upload-artifact@v4
+        with:
+          name: generator-blaszek-current
+          path: |
+            index.html
+            assets/
+            CZYTAJ-MNIE.txt
+            LICENCJA-CZCIONKI.txt
+          if-no-files-found: error
+          retention-days: 1
