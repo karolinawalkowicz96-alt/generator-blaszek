@@ -210,7 +210,7 @@ function fitMedal(p,o){
     if(!lines.length)return 0;
     const positions=base=>{
       const sizes=lines.map((l,i)=>lineSize(l.size)||(base*(lines===body&&i===0?1.18:1)));
-      const steps=sizes.map((z,i)=>i?Math.max(descent(lines[i-1])*sizes[i-1]+(ascent(lines[i])+.13)*z,spacing*z):0);
+      const steps=sizes.map((z,i)=>i?Math.max(descent(lines[i-1])*sizes[i-1]+(ascent(lines[i])+.13)*z,spacing*z)+(lines===body&&i===1?z*.30:0):0);
       const height=(ascent(lines[0])*sizes[0]+descent(lines.at(-1))*sizes.at(-1)+steps.reduce((a,b)=>a+b,0))*PT;
       let y=cy-height/2+ascent(lines[0])*sizes[0]*PT;
       return lines.map((l,i)=>{y+=steps[i]*PT;return {size:sizes[i],y}});
