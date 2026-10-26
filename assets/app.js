@@ -145,7 +145,7 @@ function newDoc(){
 let measurer=null;
 const SKEW=Math.tan(12*Math.PI/180);
 function textW(str,bold,pt,italic,font){measurer.setFont(fontName({font}),fontStyle({font,bold}));measurer.setFontSize(pt);return measurer.getTextWidth(str)+(italic?SKEW*ascent({font})*pt*PT:0)+(['charm','vibes'].includes(font)?0.35*pt*PT:0)}
-const FOOT_SCALE=0.85, FOOT_GAP=0.45;
+const FOOT_SCALE=0.85, FOOT_GAP=0.30;
 
 function opts(){
   return {margin:num($('o-margin').value,7),gap:num($('o-gap').value,0),padx:num($('o-padx').value,4.5),pady:num($('o-pady').value,2.5),
