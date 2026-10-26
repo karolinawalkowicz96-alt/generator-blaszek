@@ -223,6 +223,12 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 .brand-heading{width:100%;margin:0;line-height:0}
 .brand-full-logo{display:block;width:100%;height:auto;margin:-5.8% 0;transform:translateX(-3.2%)}
 @media(max-width:560px){.top{gap:0;padding:10px 0 8px;margin-bottom:8px}.brand-full{flex:0 1 320px;max-width:100%}.brand-full-logo{margin:-5.8% 0}.top .save-info{display:none}.top .save-info small{font-size:12px}}
+
+/* Keep dimension inputs aligned when validation messages appear. */
+.dims{align-items:start;grid-template-columns:repeat(3,minmax(0,1fr))}
+.dims>.f{min-width:0}
+.dims>.f>span:first-child{min-height:3em;display:flex;align-items:flex-end}
+.dims .field-error{color:#a12626;font-size:13px;font-weight:400;line-height:1.4;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
