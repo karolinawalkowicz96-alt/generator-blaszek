@@ -366,15 +366,34 @@ body{padding:0 28px 40px;font-size:17px}.top{max-width:1500px;display:flex;align
     </div>
 
     <div id="panel-paste" class="paste" role="tabpanel" aria-labelledby="tab-paste" hidden>
-      <details class="hint syntax"><summary>Pomoc: jak wkleić gotowy tekst</summary>
-        <ul>
-          <li>Każda blaszka zaczyna się od wymiaru albo pustej linii.</li>
-          <li>Pierwsza linia to wymiar, np. <code>80x25</code> (mm) albo <code>8 / 2,5</code> (cm).</li>
-          <li>Gwiazdka na początku linii to pogrubienie: <code>*MISTRZ</code></li>
-          <li>Podkreślnik to pochyłe litery: <code>_Gołębie młode</code></li>
-          <li>Kolor liter w klamrach: <code>{#c00000}MISTRZ</code></li>
-          <li>Małpa to napis na dole blaszki (pochyły): <code>@Hażlach, 25.10.2026</code></li>
-        </ul>
+      <details class="hint syntax paste-help">
+        <summary><span class="help-symbol" aria-hidden="true">?</span><span>Jak wkleić tekst i go sformatować?</span></summary>
+        <div class="help-content">
+          <p>W pierwszej linii wpisz <strong>szerokość × wysokość</strong>, np. <code>80x25</code> (mm). Poniżej wpisz treść — każda linia to osobny napis. Kolejną blaszkę oddziel pustą linią i zacznij od jej wymiarów.</p>
+          <div class="help-example">
+            <div class="help-example-head"><strong>Przykład gotowy do skopiowania</strong><button type="button" class="btn small" id="copy-paste-example" aria-describedby="copy-example-status">Kopiuj przykład</button></div>
+            <pre id="paste-example">80x25
+I MIEJSCE
+w Zawodach Strażackich OSP
+Kategoria: SENIOR
+@Jastrzębie-Zdrój, 20.07.2027 r.</pre>
+            <span id="copy-example-status" role="status" class="help-copy-status"></span>
+          </div>
+          <h3>Jak zmienić wygląd napisu?</h3>
+          <p>Dodaj znak lub znacznik <strong>na początku wybranej linii, przed tekstem</strong>. Nie dodawaj go na końcu. Znaczniki nie pojawią się na wydruku.</p>
+          <dl class="help-options">
+            <div><dt><b aria-hidden="true">B</b> Pogrubienie</dt><dd>Wpisz gwiazdkę <code>*</code> przed tekstem.<code class="help-code">*I MIEJSCE</code></dd></div>
+            <div><dt><i aria-hidden="true">I</i> Kursywa</dt><dd>Wpisz podkreślnik <code>_</code> przed tekstem.<code class="help-code">_w Zawodach Strażackich OSP</code></dd></div>
+            <div><dt>Pogrubienie i kursywa</dt><dd>Połącz oba znaki: <code>*_</code>.<code class="help-code">*_I MIEJSCE</code></dd></div>
+            <div><dt>Kolor liter</dt><dd>Wpisz kod koloru w klamrach. Ten przykład daje czerwony napis.<code class="help-code">{#c00000}I MIEJSCE</code></dd></div>
+            <div><dt>Dolny napis</dt><dd>Wpisz <code>@</code> przed miejscowością i datą. Napis trafi na dół blaszki, kursywą.<code class="help-code">@Jastrzębie-Zdrój, 20.07.2027 r.</code></dd></div>
+            <div><dt>Rozmiar tekstu</dt><dd>Domyślnie działa Auto. Własny rozmiar, np. 20 pt, ustaw tak:<code class="help-code">{pt:20}I MIEJSCE</code>Usuń <code>{pt:20}</code>, aby przywrócić Auto.</dd></div>
+            <div><dt>Czcionka</dt><dd>Bez znacznika: Montserrat. Dla innego kroju dodaj:<code class="help-code">{font:serif}I MIEJSCE</code>Times — Liberation Serif<code class="help-code">{font:charm}I MIEJSCE</code>Charm — kaligraficzna<code class="help-code">{font:vibes}I MIEJSCE</code>Great Vibes — pisana</dd></div>
+            <div><dt>Liczba sztuk</dt><dd>Dopisz liczbę kopii przy wymiarach, np. 3 sztuki:<code class="help-code">80x25 3szt</code></dd></div>
+          </dl>
+          <p class="help-tip">Możesz łączyć znaczniki, np. <code>*{font:charm}{pt:20}I MIEJSCE</code>. Jeśli nie chcesz wpisywać znaczników, przejdź do „Wpisuję po kolei” i użyj ikon pod linią tekstu.</p>
+          <p class="help-note">Generator pomaga też automatycznie: gdy w całym tekście nie ma gwiazdek, pogrubia rozpoznane nagłówki zapisane wielkimi literami, np. „I MIEJSCE”. Gdy nie ma znaku @, próbuje rozpoznać miejscowość i datę w ostatniej linii.</p>
+        </div>
       </details>
       <label class="f" for="src"><span>Tekst blaszek</span></label>
       <textarea id="src" spellcheck="false"></textarea>
@@ -1277,6 +1296,12 @@ function validateFields(){let valid=true;document.querySelectorAll('input[type=n
 $('dl').addEventListener('click',e=>{if(!validateFields()){e.stopImmediatePropagation();say('err','Popraw zaznaczone pola przed pobraniem PDF.');const invalid=document.querySelector('[aria-invalid="true"]');if(invalid){const details=invalid.closest('details');if(details)details.open=true;invalid.focus()}}},true);
 $('summary').before($('dl'));$('dl').after($('dl-msg'));
 
+$('copy-paste-example').addEventListener('click',async()=>{
+  const example=$('paste-example');
+  try{await navigator.clipboard.writeText(example.textContent);$('copy-example-status').textContent='Skopiowano. Wklej przykład w polu „Tekst blaszek”.'}
+  catch(e){const selection=window.getSelection();const range=document.createRange();range.selectNodeContents(example);selection.removeAllRanges();selection.addRange(range);$('copy-example-status').textContent='Zaznaczono przykład. Skopiuj go skrótem Ctrl+C lub ⌘C.'}
+});
+
 init();
 </script>
 
@@ -1292,6 +1317,9 @@ init();
 .line-toolbar .size-picker input{flex:none;box-sizing:border-box;width:68px;height:40px;min-height:40px;max-height:40px;margin:0;padding:5px 4px;border:1px solid #bcc8d7;border-radius:8px;background:var(--field);font-size:14px;text-align:center;font-variant-numeric:tabular-nums}
 .line-toolbar .btn:hover{background:var(--accent-soft)}
 @media(max-width:560px){.line .line-toolbar{gap:3px}.line-toolbar .btn.ic,.line-toolbar .btn.x{width:32px!important;min-width:32px}.line-toolbar .size-picker input{width:60px}.line-toolbar .toolbar-auto{min-width:42px;padding:4px 6px}}
+</style>
+<style>
+.paste-help{padding:12px 14px}.paste-help>summary{gap:10px;font-size:15px;line-height:1.4;list-style:none}.paste-help>summary::-webkit-details-marker{display:none}.help-symbol{display:inline-grid;place-items:center;flex:none;width:24px;height:24px;border:1.5px solid currentColor;border-radius:50%;color:var(--accent);font-size:15px;font-weight:700}.help-content{padding-top:10px;font-size:14px;line-height:1.6}.help-content p{margin:0 0 14px}.help-content h3{font-size:16px;margin:20px 0 8px}.help-example{background:var(--card);border:1px solid #d7dfe9;border-radius:10px;padding:14px}.help-example-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:14px}.help-example-head .btn{font-size:13px;min-height:36px;padding:6px 10px}.help-example pre{margin:12px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:14px;line-height:1.7}.help-copy-status{display:block;font-size:13px;color:var(--muted)}.help-options{margin:0}.help-options>div{display:grid;grid-template-columns:140px minmax(0,1fr);gap:12px;padding:12px 0;border-top:1px solid #dce3eb}.help-options dt{font-weight:600}.help-options dd{margin:0;min-width:0}.help-content code{font-size:13px;overflow-wrap:anywhere}.help-code{display:block;margin:5px 0;padding:6px 8px;border:1px solid #dce3eb;border-radius:6px;background:var(--card);white-space:pre-wrap}.help-content .help-tip{margin-top:14px}.help-note{color:var(--muted);font-size:13px}@media(max-width:560px){.help-options>div{grid-template-columns:1fr;gap:4px}.help-example{padding:10px}}
 </style>
 </body>
 </html>
