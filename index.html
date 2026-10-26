@@ -218,16 +218,17 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 .page-nav{margin-top:14px!important}
 @media(min-width:1101px){.right{max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
 @media(max-width:1100px){.sheet{width:min(100%,640px)}}
+/* Full supplied logo, preserving its proportions on every screen. */
+.brand-full{flex:0 1 620px;min-width:0}
+.brand-heading{width:100%;margin:0;line-height:0}
+.brand-full-logo{display:block;width:100%;height:auto}
+@media(max-width:560px){.brand-full{flex-basis:100%}.top .save-info{padding-left:0}}
 </style>
 </head>
 <body>
 <header class="top">
-  <div class="brand">
-    <img class="brand-logo" src="assets/logo-128.webp" width="56" height="56" alt="" fetchpriority="high">
-    <div class="brand-text">
-      <h1>Generator <span class="accent">Blaszek</span></h1>
-      <p class="lead">Szybko i łatwo twórz blaszki ze spersonalizowanym napisem.</p>
-    </div>
+  <div class="brand brand-full">
+    <h1 class="brand-heading"><img class="brand-full-logo" src="assets/logo-generator-blaszek.png" width="2048" height="686" alt="Generator Blaszek — Szybko i łatwo twórz blaszki ze spersonalizowanym napisem. by Dawid Tokarski" fetchpriority="high"></h1>
   </div>
   <div class="save-info"><span id="save-status" role="status">Gotowy do pracy</span><small>Dane są zapisywane w tej przeglądarce.</small></div>
 </header>
