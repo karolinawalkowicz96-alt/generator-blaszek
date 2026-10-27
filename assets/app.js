@@ -27,7 +27,7 @@ function loadFamily(key){
    .catch(e=>{delete fontLoading[key];throw e});
   return fontLoading[key];
 }
-const usedFamilies=()=>{const s=new Set(['sans']);plates.forEach(p=>p.lines.forEach(l=>s.add(fontKey(l.font))));return [...s]};
+const usedFamilies=()=>{const s=new Set(['sans']);plates.forEach(p=>[...p.lines,p.arcTop,p.arcBottom].filter(Boolean).forEach(l=>s.add(fontKey(l.font))));return [...s]};
 const ensureFonts=keys=>Promise.all(keys.map(loadFamily));
 function addFamily(doc,key){const f=FONTS[key];for(const [style,file,bin] of fontBin[key]){doc.addFileToVFS(file,bin);doc.addFont(file,f.pdf,style)}}
 
@@ -43,7 +43,7 @@ function loadJsPdf(){
 /* ---------- state ---------- */
 let uid=1;
 const okCol=c=>typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c)?c.toLowerCase():null;
-const lineSize=v=>Number.isFinite(+v)&&+v>=4.5&&+v<=200?+v:null;
+const lineSize=v=>Number.isFinite(+v)&&+v>=0.1&&+v<=200?+v:null;
 const fontKey=f=>['serif','charm','vibes'].includes(f)?f:'sans';
 const fontName=l=>FONTS[fontKey(l.font)].pdf;
 const fontCss=l=>({sans:'MontserratEmb, sans-serif',serif:'SerifEmb, serif',charm:'CharmEmb, cursive',vibes:'VibesEmb, cursive'})[fontKey(l.font)];
@@ -54,9 +54,14 @@ const lineStep=(prev,next,a,b,o)=>Math.max(0.22*a+(o.lh-0.22)*b,descent(prev)*a+
 const MEDAL_SIZES=[27,41,52];
 const MEDAL_TEXT_MARGIN_MM=2; // Safe text diameters: 23, 37 and 48 mm.
 const safeDiameter=p=>p.w-2*MEDAL_TEXT_MARGIN_MM;
+const cleanLine=l=>({text:String(l?.text||''),bold:!!l?.bold,italic:!!l?.italic,color:okCol(l?.color),size:lineSize(l?.size),font:fontKey(l?.font)});
+const editLine=(p,key)=>key==='arcTop'||key==='arcBottom'?p[key]:p.lines[+key];
+const hasArcs=p=>!!(p.arcTop?.text.trim()||p.arcBottom?.text.trim());
+const richMedal=p=>p.shape==='medal'&&(hasArcs(p)||p.centerLogo);
+
 const validLogo=l=>l&&/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(l.data)&&l.w>0&&l.h>0?{data:l.data,w:l.w,h:l.h,r:Number.isFinite(l.r)&&l.r>0?l.r:Math.hypot(l.w,l.h)/2}:null;
 const itemName=p=>p.shape==='medal'?'Medal':'Blaszka';
-const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,logo:validLogo(p.logo),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
+const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,logo:validLogo(p.logo),centerLogo:validLogo(p.centerLogo),centerMode:p.centerMode==='logo'?'logo':'text',arcTop:cleanLine(p.arcTop),arcBottom:cleanLine(p.arcBottom),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
 let plates=[];
 const KEY='blaszki-state-v3';
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(plates.map(({id,...r})=>r)));localStorage.setItem(KEY+'-options',JSON.stringify(opts()));$('save-status').textContent='Zapisano w przeglądarce'}catch(e){$('save-status').textContent='Nie udało się zapisać danych'}}
@@ -137,7 +142,7 @@ const colorTag=c=>c&&c!=='#000000'?`[${colorName(c)||c}]`:'';
 const sizeTag=v=>v?`[${String(v).replace('.',',')}pt]`:'';
 const fontTag=f=>({serif:'[times]',charm:'[charm]',vibes:'[vibes]'})[fontKey(f)]||'';
 function toText(){
-  return plates.filter(p=>!p.logo).map(p=>[(p.shape==='medal'?`medal ${p.w}mm`:`${p.w}x${p.h}`)+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
+  return plates.filter(p=>!p.logo&&!richMedal(p)).map(p=>[(p.shape==='medal'?`medal ${p.w}mm`:`${p.w}x${p.h}`)+(p.copies>1?` ${p.copies}szt`:'')+(p.pt?` ${p.pt}pt`:''),
     ...p.lines.map(l=>(l.bold?'*':'')+(l.italic?'_':'')+colorTag(l.color)+sizeTag(l.size)+fontTag(l.font)+l.text),
     ...(p.footer?p.footer.split('\n').map(t=>'@'+colorTag(p.footerColor)+t):[])].join('\n')).join('\n\n');
 }
@@ -160,6 +165,7 @@ function opts(){
 }
 function fit(p,o){
   if(p.shape==='medal'&&p.logo){p.vis=[];p.fs=0;p.overflow=false;p.small=false;return}
+  if(p.shape==='medal'){fitArcs(p);if(p.centerMode==='logo'){p.vis=[];p.fs=0;p.overflow=false;p.small=false;return}}
   const lines=p.lines.filter(l=>l.text.trim()).map(l=>({...l,scale:1,gap:0}));
   if(p.footer&&p.footer.trim()){
     const foot=p.shape==='medal'?p.footer.split('\n').map(t=>t.trim()).filter(Boolean):[p.footer.trim()];
@@ -168,7 +174,7 @@ function fit(p,o){
   p.vis=lines;
   const n=lines.length; if(!n||p.w<=0||p.h<=0){p.fs=0;p.overflow=false;p.small=false;return}
   const medal=p.shape==='medal';
-  if(medal){fitMedal(p,o);return}
+  if(medal){if(hasArcs(p)){const d=p.centerDiameter;const inner={...p,w:d,h:d};fitMedal(inner,o);p.vis=inner.vis.map(l=>({...l,offsetY:l.offsetY+(p.w-d)/2}));p.fs=inner.fs;p.overflow=false;p.small=false}else fitMedal(p,o);return}
   const diameter=safeDiameter(p);
   const inset=medal?(p.w-diameter)/2:0;
   const availW=p.w-2*(medal?inset:o.padx), availH=p.h-2*(medal?inset:o.pady);
@@ -204,6 +210,49 @@ function fit(p,o){
   p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>p.h-0.6||!circleFits(ss,medal?(p.w-diameter)/2:0.3);
   p.small=!medal&&!p.overflow&&Math.min(...ss)<6;
 }
+// One glyph layout is shared by SVG and PDF, so both outputs have identical arcs.
+function fitArcs(p){
+  p.arcGlyphs=[];
+  const outer=p.w/2-MEDAL_TEXT_MARGIN_MM;
+  let inner=outer;
+  for(const key of ['arcTop','arcBottom']){
+    const l=p[key];if(!l?.text.trim())continue;
+    const chars=Array.from(l.text.trim().normalize('NFC'));
+    const geometry=size=>{
+      const height=(ascent(l)+descent(l)+.25)*size*PT;
+      const radius=outer-height;
+      const widths=chars.map(c=>textW(c,l.bold,size,l.italic,l.font));
+      return {height,radius,widths,total:widths.reduce((a,b)=>a+b,0)};
+    };
+    let lo=0,hi=l.size||Math.min(16,p.w*.27);
+    for(let i=0;i<40;i++){const m=(lo+hi)/2,g=geometry(m);if(g.radius>outer*.55&&g.total/g.radius<=Math.PI*.88)lo=m;else hi=m}
+    const size=lo,g=geometry(size),bottom=key==='arcBottom';
+    // Bottom letters read upright from left to right along the lower arc.
+    const radius=bottom?g.radius+ascent(l)*size*PT:g.radius;
+    let cursor=-g.total/2;
+    chars.forEach((text,i)=>{const a=(cursor+g.widths[i]/2)/radius;cursor+=g.widths[i];
+      p.arcGlyphs.push({...l,text,size,key,dx:radius*Math.sin(a),dy:(bottom?1:-1)*radius*Math.cos(a),angle:(bottom?-1:1)*a*180/Math.PI});
+    });
+    inner=Math.min(inner,g.radius-descent(l)*size*PT-p.w*.035);
+  }
+  p.centerDiameter=Math.max(p.w*.2,inner*2);
+}
+function arcSvg(p){return (p.arcGlyphs||[]).map(l=>{const x=p.x+p.w/2+l.dx,y=p.y+p.h/2+l.dy;return `<text x="0" y="0" text-anchor="middle" transform="translate(${x} ${y}) rotate(${l.angle})${l.italic?' skewX(-12)':''}" font-family="${fontCss(l)}" font-weight="${fontStyle(l)==='bold'?700:400}" font-size="${l.size*PT}"${l.font==='vibes'&&l.bold?` stroke="${l.color||'#000000'}" stroke-width="${l.size*PT*.018}" paint-order="stroke fill"`:''} fill="${l.color||'#000000'}">${esc(l.text)}</text>`}).join('')}
+function drawArcPdf(doc,p,l){
+  const x=p.x+p.w/2+l.dx,y=p.y+p.h/2+l.dy;
+  doc.setFont(fontName(l),fontStyle(l));doc.setFontSize(l.size);doc.setTextColor(l.color||'#000000');
+  doc.internal.write('q');
+  if(l.italic){
+    const t=-l.angle*Math.PI/180,c=Math.cos(t),s=Math.sin(t),a=1-c*s*SKEW,b=-s*s*SKEW,k=c*c*SKEW,d=1+c*s*SKEW,X=x/PT,Y=(PAGE_H-y)/PT;
+    doc.internal.write(`${a} ${b} ${k} ${d} ${X-a*X-k*Y} ${Y-b*X-d*Y} cm`);
+  }
+  const bold=l.font==='vibes'&&l.bold;
+  if(bold){doc.setDrawColor(l.color||'#000000');doc.setLineWidth(l.size*PT*.018)}
+  doc.text(l.text,x,y,{align:'center',baseline:'alphabetic',angle:-l.angle,renderingMode:bold?'fillThenStroke':'fill'});
+  doc.internal.write('Q');
+}
+function centerLogoBox(p){const d=hasArcs(p)?p.centerDiameter:safeDiameter(p);return {x:p.x+(p.w-d)/2,y:p.y+(p.h-d)/2,w:d,h:d}}
+
 function fitMedal(p,o){
   const radius=safeDiameter(p)/2,center=p.w/2;
   const body=p.vis.filter(l=>!l.footer),foot=p.vis.filter(l=>l.footer);
@@ -267,19 +316,19 @@ function logoBox(p){
   return {x:p.x+(p.w-w)/2,y:p.y+(p.h-h)/2,w,h};
 }
 // The crop preview and export use exactly the same transform and circular mask.
-async function readLogo(file){
+async function readLogo(file,center=false){
   if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Wybierz plik PNG, JPG lub WebP.');
   const url=URL.createObjectURL(file),img=new Image();
-  try{img.src=url;await img.decode();return await cropLogo(img)}finally{URL.revokeObjectURL(url)}
+  try{img.src=url;await img.decode();return await cropLogo(img,center)}finally{URL.revokeObjectURL(url)}
 }
-function cropLogo(img){
+function cropLogo(img,center=false){
   return new Promise(resolve=>{
     const dialog=document.createElement('dialog');dialog.className='crop-dialog';
     dialog.innerHTML=`<form method="dialog"><div class="crop-heading"><div><h2 id="crop-title">Dopasuj logo do medalu</h2><p>Przesuń grafikę i ustaw powiększenie.</p></div><button class="btn" value="cancel" aria-label="Zamknij kadrowanie">×</button></div>
       <div class="crop-stage"><canvas width="600" height="600" aria-label="Podgląd kadru logo. Przeciągnij grafikę lub użyj strzałek poniżej." tabindex="0"></canvas></div>
       <label class="crop-zoom">Powiększenie <output>100%</output><input aria-label="Powiększenie logo" type="range" min="20" max="400" value="100" step="1"></label>
       <div class="crop-tools"><div class="crop-arrows" role="group" aria-label="Przesuń logo"><button type="button" class="btn" data-move="-10,0" aria-label="Przesuń w lewo">←</button><button type="button" class="btn" data-move="0,-10" aria-label="Przesuń w górę">↑</button><button type="button" class="btn" data-move="0,10" aria-label="Przesuń w dół">↓</button><button type="button" class="btn" data-move="10,0" aria-label="Przesuń w prawo">→</button></div><button type="button" class="btn" data-reset>Wyśrodkuj i dopasuj</button><button class="btn primary" type="button" data-save>Zatwierdź kadr</button></div>
-      <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. Zatwierdzony kadr wypełni medal aż do obramowania, bez dodatkowego marginesu.</p>
+      <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. ${center?'Logo zostanie dopasowane do środka medalu, z odstępem od napisów po łuku.':'Zatwierdzony kadr wypełni medal aż do obramowania, bez dodatkowego marginesu.'}</p>
       </form>`;
     dialog.setAttribute('aria-labelledby','crop-title');document.body.append(dialog);
     const canvas=dialog.querySelector('canvas'),ctx=canvas.getContext('2d'),range=dialog.querySelector('input'),output=dialog.querySelector('output');
@@ -304,10 +353,10 @@ function cropLogo(img){
 /* ---------- step 1: cards ---------- */
 const colorBtn=c=>`<button type="button" class="btn boldt ic colbtn" data-act="color" aria-label="Kolor liter" title="Kolor liter"><span class="ai">A<span class="bar" style="background:${c||'#000000'}"></span></span></button>`;
 function lineRow(p,li){
-  const l=p.lines[li];
-  return `<div class="line" data-li="${li}"><label class="line-label" for="t-${p.id}-${li}">Linia ${li+1}</label>
-    <input type="text" id="t-${p.id}-${li}" class="${l.bold?'b':''}${l.italic?' i':''}" value="${esc(l.text)}" aria-label="${itemName(p)} ${idxOf(p)}, linia ${li+1}" data-act="text"${l.color?` style="color:${l.color}"`:''}>
-    <div class="tg line-toolbar" role="group" aria-label="Formatowanie linii ${li+1}">
+  const l=editLine(p,li),label=li==='arcTop'?'Napis po łuku — góra':li==='arcBottom'?'Napis po łuku — dół':`Linia ${li+1}`;
+  return `<div class="line" data-li="${li}"><label class="line-label" for="t-${p.id}-${li}">${label}</label>
+    <input type="text" id="t-${p.id}-${li}" class="${l.bold?'b':''}${l.italic?' i':''}" value="${esc(l.text)}" aria-label="${itemName(p)} ${idxOf(p)}, ${label}" data-act="text"${l.color?` style="color:${l.color}"`:''}>
+    <div class="tg line-toolbar" role="group" aria-label="Formatowanie ${label}">
       <button type="button" class="btn boldt ic" data-act="bold" aria-pressed="${l.bold}" aria-label="Pogrubienie" title="Pogrubienie"><span class="bi">B</span></button>
       <button type="button" class="btn boldt ic it" data-act="italic" aria-pressed="${l.italic}" aria-label="Kursywa" title="Kursywa"><span class="ii">I</span></button>
       ${colorBtn(l.color)}
@@ -315,9 +364,10 @@ function lineRow(p,li){
       <button type="button" class="btn ic font-choice font-serif" data-act="font-serif" aria-pressed="${l.font==='serif'}" aria-label="Czcionka Times — Liberation Serif" title="Times — Liberation Serif"><span aria-hidden="true">Aa</span></button>
       <button type="button" class="btn ic font-choice font-charm" data-act="font-charm" aria-pressed="${l.font==='charm'}" aria-label="Czcionka Charm — kaligraficzna" title="Charm — kaligraficzna"><span aria-hidden="true">Aa</span></button>
       <button type="button" class="btn ic font-choice font-vibes" data-act="font-vibes" aria-pressed="${l.font==='vibes'}" aria-label="Czcionka Great Vibes — pisana" title="Great Vibes — pisana"><span aria-hidden="true">Aa</span></button>
-      <label class="size-picker" title="Rozmiar w punktach. Puste pole = Auto."><input type="number" min="4.5" max="200" step="0.5" inputmode="decimal" placeholder="Auto" value="${l.size||''}" data-act="line-size" aria-label="Rozmiar linii ${li+1} w punktach" aria-describedby="size-help-${p.id}"></label>
-      <button type="button" class="btn toolbar-auto" data-act="line-auto" title="Przywróć automatyczny rozmiar linii ${li+1}" aria-label="Automatyczny rozmiar linii ${li+1}">Auto</button>
-      <button type="button" class="btn x" data-act="del-line" aria-label="Usuń linię ${li+1}" title="Usuń linię">×</button>
+      <button type="button" class="btn ic" data-act="line-minus" aria-label="Pomniejsz: ${label}" title="Pomniejsz">−</button>
+      <button type="button" class="btn ic" data-act="line-plus" aria-label="Powiększ: ${label}" title="Powiększ">+</button>
+      <button type="button" class="btn toolbar-auto" data-act="line-auto" aria-pressed="${!l.size}" title="Przywróć automatyczny rozmiar ${label}" aria-label="Automatyczny rozmiar ${label}">Auto</button>
+      ${typeof li==='number'?`<button type="button" class="btn x" data-act="del-line" aria-label="Usuń linię ${li+1}" title="Usuń linię">×</button>`:''}
     </div>
   </div>`;
 }
@@ -335,21 +385,22 @@ function cardHtml(p){
         <label class="f n"><span>Liczba sztuk</span><input type="number" inputmode="numeric" step="1" min="1" id="c-${p.id}" value="${p.copies}" data-act="copies"></label>
       </div>
     </div>
-    ${p.shape==='medal'?`<div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr wypełnia cały medal, aż do obramowania.':'Wybierz grafikę i przytnij ją w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div>`:''}
-    <div class="lines" ${p.logo?'hidden':''}>
-      <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Puste pole rozmiaru = Auto. Wpisz wartość, aby powiększyć lub pomniejszyć linię. Przycisk Auto przywraca dopasowanie.</p>
+    ${p.shape==='medal'&&!p.logo?`<section class="medal-arcs"><strong>Napisy po okręgu (opcjonalnie)</strong><p class="type-help">Góra i dół wyśrodkują się automatycznie. Długi napis zmniejszy się, aby zmieścić się na łuku.</p>${lineRow(p,'arcTop')}${lineRow(p,'arcBottom')}<div class="center-choice" role="group" aria-label="Środek medalu"><span>Środek medalu:</span><button class="btn" type="button" data-act="center-text" aria-pressed="${p.centerMode!=='logo'}">Tekst</button><button class="btn" type="button" data-act="center-logo" aria-pressed="${p.centerMode==='logo'}">Logo</button></div>${p.centerMode==='logo'?`<div class="medal-logo"><p class="type-help">Logo dopasuje się do wolnego środka i nie nachodzi na napisy. Wybierz grafikę, przesuń ją i zatwierdź kadr.</p><button class="btn" type="button" data-act="add-center-logo">${p.centerLogo?'Zmień / przytnij logo':'Wybierz logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="center-logo-file" aria-label="Logo w środku medalu"></div>`:''}</section>`:''}
+    <div class="lines" ${p.logo||p.centerMode==='logo'?'hidden':''}>
+      <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Użyj − i +, aby zmienić rozmiar. Auto przywraca automatyczne dopasowanie.</p>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
     </div>
-    <div class="foot" ${p.logo?'hidden':''}>
+    <div class="foot" ${p.logo||p.centerMode==='logo'?'hidden':''}>
       <label class="f" for="f-${p.id}"><span>Dolny napis (opcjonalnie, kursywą)</span></label>
       <div class="footrow" data-li="foot">
         ${p.shape==='medal'?`<textarea id="f-${p.id}" rows="2" placeholder="Miejscowość&#10;Data" data-act="footer" aria-describedby="footer-help-${p.id}"${p.footerColor?` style="color:${p.footerColor}"`:''}>${esc(p.footer||'')}</textarea>`:`<input type="text" id="f-${p.id}" value="${esc(p.footer||'')}" placeholder="np. Hażlach, 25.10.2026" data-act="footer"${p.footerColor?` style="color:${p.footerColor}"`:''}>`}
         ${p.shape==='medal'?`<small id="footer-help-${p.id}" class="footer-help">Enter dodaje kolejną linię dolnego napisu.</small>`:''}
       </div>
     </div>
+    ${p.shape==='medal'?`<details class="reverse-option" ${p.logo?'open':''}><summary>Osobny rewers z logo</summary><div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr wypełnia cały medal, aż do obramowania.':'Wybierz grafikę i przytnij ją w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div></details>`:''}
     <div class="plate-warn" data-warn hidden></div>
     <div class="row">
-      <button type="button" class="btn" data-act="add-line" ${p.logo?'hidden':''}>Dodaj linię</button>
+      <button type="button" class="btn" data-act="add-line" ${p.logo||p.centerMode==='logo'?'hidden':''}>Dodaj linię</button>
       <button type="button" class="btn" data-act="dup">Duplikuj</button>
       ${p.shape==='medal'?'<button type="button" class="btn" data-act="fill-sheet">Zapełnij całą kartkę</button>':''}
       <button type="button" class="btn danger" data-act="del">Usuń ${p.shape==='medal'?'medal':'blaszkę'}</button>
@@ -361,8 +412,8 @@ const byId=id=>plates.find(p=>p.id===+id);
 
 $('cards').addEventListener('input',e=>{
   const card=e.target.closest('.plate'); if(!card) return; const p=byId(card.dataset.id); const act=e.target.dataset.act;
-  if(act==='text'){p.lines[+e.target.closest('.line').dataset.li].text=e.target.value}
-  else if(act==='line-size'){p.lines[+e.target.closest('.line').dataset.li].size=lineSize(e.target.value)}
+  if(act==='text'){editLine(p,e.target.closest('.line').dataset.li).text=e.target.value}
+  else if(act==='line-size'){editLine(p,e.target.closest('.line').dataset.li).size=lineSize(e.target.value)}
   else if(act==='w'){p.w=num(e.target.value,0)} else if(act==='h'){p.h=num(e.target.value,0)}
   else if(act==='diameter'&&MEDAL_SIZES.includes(+e.target.value)){p.w=p.h=+e.target.value}
   else if(act==='copies'){p.copies=Math.max(1,parseInt(e.target.value)||1)}
@@ -370,16 +421,18 @@ $('cards').addEventListener('input',e=>{
   changed();
 });
 $('cards').addEventListener('change',async e=>{
-  if(e.target.dataset.act!=='logo-file')return;
+  if(!['logo-file','center-logo-file'].includes(e.target.dataset.act))return;
+  const center=e.target.dataset.act==='center-logo-file';
   const input=e.target,p=byId(input.closest('.plate').dataset.id),file=input.files[0];if(!file)return;
-  try{const logo=await readLogo(file);if(!logo||!plates.includes(p))return;
-    if(p.logo){p.logo=logo;rerenderCard(p);changed()}
+  try{const logo=await readLogo(file,center);if(!logo||!plates.includes(p))return;
+    if(center){p.centerLogo=logo;p.centerMode='logo';rerenderCard(p);changed()}
+    else if(p.logo){p.logo=logo;rerenderCard(p);changed()}
     else{const back=mk({shape:'medal',w:p.w,copies:p.copies,logo,lines:[]});plates.splice(plates.indexOf(p)+1,0,back);renderCards();changed();flash(back,true)}
-    toast('Logo dopasowane. Rewers jest osobnym elementem do wydruku.');
+    toast(center?'Logo dopasowane do środka medalu.':'Logo dopasowane. Rewers jest osobnym elementem do wydruku.');
   }catch(err){toast(err.message||'Nie udało się odczytać logo. Spróbuj innego pliku.')}finally{input.value=''}
 });
 $('cards').addEventListener('keydown',e=>{
-  if(e.key==='Enter'&&e.target.dataset.act==='text'){
+  if(e.key==='Enter'&&e.target.dataset.act==='text'&&!e.target.closest('.medal-arcs')){
     e.preventDefault(); const card=e.target.closest('.plate'); const p=byId(card.dataset.id); const li=+e.target.closest('.line').dataset.li;
     p.lines.splice(li+1,0,{text:'',bold:false}); rerenderCard(p); focusLine(p,li+1); changed();
   }
@@ -387,7 +440,9 @@ $('cards').addEventListener('keydown',e=>{
 $('cards').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return; const card=b.closest('.plate'); if(!card) return;
   const p=byId(card.dataset.id); const act=b.dataset.act;
-  if(['font-sans','font-serif','font-charm','font-vibes'].includes(act)){const li=+b.closest('.line').dataset.li;p.lines[li].font=fontKey(act.slice(5));b.closest('.line-toolbar').querySelectorAll('.font-choice').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));loadFamily(p.lines[li].font).catch(()=>{});changed();return}
+  if(['font-sans','font-serif','font-charm','font-vibes'].includes(act)){const li=b.closest('.line').dataset.li;editLine(p,li).font=fontKey(act.slice(5));b.closest('.line-toolbar').querySelectorAll('.font-choice').forEach(btn=>btn.setAttribute('aria-pressed',String(btn===b)));loadFamily(editLine(p,li).font).catch(()=>{});changed();return}
+  if(act==='center-text'||act==='center-logo'){p.centerMode=act==='center-logo'?'logo':'text';rerenderCard(p);changed();return}
+  if(act==='add-center-logo'){card.querySelector('[data-act=center-logo-file]').click();return}
   if(act==='add-logo'){card.querySelector('[data-act=logo-file]').click();return}
   if(act==='fill-sheet'){
     const o=opts(),g=Math.max(0,o.gap);
@@ -396,11 +451,16 @@ $('cards').addEventListener('click',e=>{
     p.copies=cols*rows;rerenderCard(p);changed();
     toast(`Ustawiono ${p.copies} medali (${cols} × ${rows}) — pełna kartka tego wzoru. Inne projekty pozostają na liście.`);return;
   }
-  if(act==='line-auto'){const li=+b.closest('.line').dataset.li;p.lines[li].size=null;rerenderCard(p);changed();$('card-'+p.id).querySelectorAll('[data-act="line-size"]')[li].focus();return}
-  if(act==='color'){const li=b.closest('[data-li]').dataset.li;openPop(b,p,li==='foot'?'foot':+li);return}
-  if(act==='italic'){const li=+b.closest('.line').dataset.li;p.lines[li].italic=!p.lines[li].italic;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
-  else if(act==='bold'){const li=+b.closest('.line').dataset.li;p.lines[li].bold=!p.lines[li].bold;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
-  else if(act==='del-line'){const li=+b.closest('.line').dataset.li;p.lines.splice(li,1);rerenderCard(p);changed()}
+  if(['line-minus','line-plus','line-auto'].includes(act)){
+    const li=b.closest('.line').dataset.li,l=editLine(p,li);
+    if(act==='line-auto')l.size=null;
+    else{const sample={...p};fit(sample,opts());const current=li==='arcTop'||li==='arcBottom'?sample.arcGlyphs?.find(g=>g.key===li)?.size:sample.vis?.filter(v=>!v.footer)[p.lines.slice(0,+li).filter(v=>v.text.trim()).length]?.size;l.size=Math.max(.1,Math.min(200,(current||l.size||10)+(act==='line-plus'?.5:-.5)))}
+    rerenderCard(p);changed();$('card-'+p.id).querySelector(`[data-li="${li}"] [data-act="${act}"]`).focus();return;
+  }
+  if(act==='color'){const li=b.closest('[data-li]').dataset.li;openPop(b,p,li==='foot'?'foot':li);return}
+  if(act==='italic'){const li=b.closest('.line').dataset.li;editLine(p,li).italic=!editLine(p,li).italic;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
+  else if(act==='bold'){const li=b.closest('.line').dataset.li;editLine(p,li).bold=!editLine(p,li).bold;rerenderCard(p);changed();$(`t-${p.id}-${li}`).focus()}
+  else if(act==='del-line'){const li=b.closest('.line').dataset.li;p.lines.splice(li,1);rerenderCard(p);changed()}
   else if(act==='add-line'){p.lines.push({text:'',bold:false});rerenderCard(p);focusLine(p,p.lines.length-1);changed()}
   else if(act==='dup'){const c=mk(p);plates.splice(plates.indexOf(p)+1,0,c);renderCards();changed();flash(c,true)}
   else if(act==='del'){const at=plates.indexOf(p);plates.splice(at,1);renderCards();changed();toast(`Usunięto blaszkę ${at+1}.`,()=>{plates.splice(at,0,p);renderCards();changed();flash(p,true)})}
@@ -422,10 +482,10 @@ $('add-medal').addEventListener('click',()=>{
 
 /* ---------- kolor liter (okienko) ---------- */
 let popT=null;
-function curColor(){const {p,li}=popT;return (li==='foot'?p.footerColor:p.lines[li].color)||'#000000'}
+function curColor(){const {p,li}=popT;return (li==='foot'?p.footerColor:editLine(p,li).color)||'#000000'}
 function setColor(c,all){
   const {p,li}=popT; c=okCol(c)||'#000000'; const v=c==='#000000'?null:c;
-  if(all){p.lines.forEach(l=>l.color=v)} else if(li==='foot') p.footerColor=v; else p.lines[li].color=v;
+  if(all){[...p.lines,p.arcTop,p.arcBottom].filter(Boolean).forEach(l=>l.color=v)} else if(li==='foot') p.footerColor=v; else editLine(p,li).color=v;
   rerenderCard(p); changed();
 }
 function openPop(btn,p,li){
@@ -468,7 +528,7 @@ function showTab(which){
   if(form) renderCards(); else $('src').value=toText();
 }
 $('tab-form').onclick=()=>showTab('form'); $('tab-paste').onclick=()=>showTab('paste');
-$('src').addEventListener('input',()=>{plates=[...fromText($('src').value),...plates.filter(p=>p.logo)];changed()});
+$('src').addEventListener('input',()=>{plates=[...fromText($('src').value),...plates.filter(p=>p.logo||richMedal(p))];changed()});
 
 /* ---------- toast ---------- */
 function toast(text,undo){
@@ -484,7 +544,7 @@ function build(){
   if(!measurer) return;
   const o=opts();
   const items=[];
-  plates.forEach((p,i)=>{for(let c=0;c<Math.max(1,p.copies||1);c++) items.push({src:p,shape:p.shape,logo:p.logo,nr:i+1,w:p.w,h:p.h,pt:p.pt,lines:p.lines,footer:p.footer,footerColor:p.footerColor})});
+  plates.forEach((p,i)=>{for(let c=0;c<Math.max(1,p.copies||1);c++) items.push({src:p,shape:p.shape,logo:p.logo,centerLogo:p.centerLogo,centerMode:p.centerMode,arcTop:p.arcTop,arcBottom:p.arcBottom,nr:i+1,w:p.w,h:p.h,pt:p.pt,lines:p.lines,footer:p.footer,footerColor:p.footerColor})});
   items.forEach(it=>fit(it,o));
   layout={o,items,...pack(items,o)};
   renderPreview(); applyWarns();
@@ -497,6 +557,8 @@ function sheetSvg(i){
     const border=`class="box" fill="${p.overflow?'#fde3df':'#ffffff'}" stroke="rgb(${rgb})" stroke-width="${Math.max(o.stroke,0.18)}"`;
     s+=p.shape==='medal'?`<circle ${border} cx="${p.x+p.w/2}" cy="${p.y+p.h/2}" r="${p.w/2}"/>`:`<rect ${border} x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}"/>`;
     if(p.logo){const b=logoBox(p);s+=`<image href="${p.logo.data}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`;}
+    s+=arcSvg(p);
+    if(p.centerMode==='logo'&&p.centerLogo){const b=centerLogoBox(p);s+=`<image href="${p.centerLogo.data}" x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}"/>`}
     if(p.fs) for(const l of linePos(p,o)) s+=`<text x="${l.x}" y="${l.y}" text-anchor="middle" font-family="${fontCss(l)}" font-weight="${fontStyle(l)==='bold'?700:400}"${l.font==='vibes'&&l.bold?` stroke="${l.color||'#000000'}" stroke-width="${l.size*PT*0.018}" paint-order="stroke fill"`:''} font-size="${l.size*PT}" fill="${l.color||'#000000'}"${l.italic?` transform="translate(${l.x} ${l.y}) skewX(-12) translate(${-l.x} ${-l.y})"`:''}>${esc(l.text)}</text>`;
     s+=`</g>`;
   }
@@ -553,6 +615,8 @@ function makePdfDoc(){
     for(const p of pg){
       if(o.stroke>0){if(p.shape==='medal')doc.circle(p.x+p.w/2,p.y+p.h/2,p.w/2,'S');else doc.rect(p.x,p.y,p.w,p.h,'S');}
       if(p.logo){const b=logoBox(p);doc.addImage(p.logo.data,'PNG',b.x,b.y,b.w,b.h,undefined,'FAST');}
+      if(p.centerMode==='logo'&&p.centerLogo){const b=centerLogoBox(p);doc.addImage(p.centerLogo.data,'PNG',b.x,b.y,b.w,b.h,undefined,'FAST')}
+      for(const l of p.arcGlyphs||[])drawArcPdf(doc,p,l)
       if(p.fs) for(const l of linePos(p,o)){
         doc.setFont(fontName(l),fontStyle(l));doc.setFontSize(l.size);
         const c=l.color||'#000000';doc.setTextColor(parseInt(c.slice(1,3),16),parseInt(c.slice(3,5),16),parseInt(c.slice(5,7),16));

@@ -12,7 +12,7 @@
 <link rel="preload" href="assets/fonts/montserrat-regular.ttf" as="fetch" type="font/ttf" crossorigin>
 <link rel="preload" href="assets/fonts/montserrat-bold.ttf" as="fetch" type="font/ttf" crossorigin>
 <link rel="preload" href="assets/jspdf.umd.min.js?v=2" as="script">
-<script src="assets/app.js?v=18" defer></script>
+<script src="assets/app.js?v=19" defer></script>
 <style>
 body{margin:0}[hidden]{display:none!important}img{max-width:100%}.line-type{display:grid;grid-template-columns:minmax(0,1fr) 115px auto;gap:8px;align-items:end}.line-type .f{min-width:0}.line-type .f select,.line-type .f input{width:100%;min-width:0;font-size:15px;min-height:44px;padding:8px}.line-type .btn{background:#f4f6f9;font-size:14px}.type-help{font-size:13px;color:var(--muted);margin:0 0 6px}.line+.line{margin-top:14px;padding-top:14px;border-top:1px solid #e3e8ef}@media(max-width:560px){.line-type{grid-template-columns:minmax(0,1fr) 94px auto;gap:6px}.line-type .f:first-child{grid-column:1/-1}.line-type .f:nth-child(2){grid-column:1/3}.line-type .f>span{font-size:13px}}
 .brand-credit{margin:4px 0 0;font-size:12px;line-height:1.4;font-weight:400;letter-spacing:.02em;color:var(--muted,#667085)}
@@ -248,6 +248,8 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 .crop-dialog{width:min(620px,calc(100vw - 24px));padding:18px}.crop-heading h2{font-size:20px}.crop-heading p{margin:4px 0 12px;font-size:14px}.crop-stage{width:min(280px,calc(100dvh - 310px),100%);padding:6px}.crop-zoom{margin:10px 0;gap:2px;font-size:14px}.crop-zoom input{min-height:24px}.crop-tools{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px}.crop-arrows{gap:4px;flex-wrap:nowrap}.crop-tools .btn{min-height:36px;padding:6px 9px;font-size:13px;white-space:nowrap}.crop-arrows .btn{width:32px;min-width:32px;padding:4px}.crop-tools [data-reset]{justify-self:center}.crop-note{margin:10px 0 0;padding:9px 11px;font-size:12px;line-height:1.4}.crop-heading>.btn{min-height:34px;padding:4px 10px}@media(max-width:560px){.crop-dialog{padding:14px}.crop-heading h2{font-size:18px}.crop-stage{width:min(260px,calc(100dvh - 340px),100%)}.crop-tools{grid-template-columns:1fr 1fr;gap:8px}.crop-arrows{grid-column:1/-1;justify-content:center}.crop-arrows .btn{width:40px;min-height:40px}.crop-tools [data-reset]{justify-self:stretch}.crop-tools .btn{white-space:normal}.crop-note{font-size:11px}}@media(max-height:450px){.crop-heading p,.crop-note{display:none}.crop-stage{width:min(160px,calc(100dvh - 180px))}.crop-zoom{margin:4px 0}}
 .crop-tools{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.crop-tools .crop-arrows{justify-self:start}.crop-tools [data-reset]{justify-self:center}.crop-tools [data-save]{justify-self:end}@media(max-width:560px){.crop-tools{grid-template-columns:1fr 1fr}.crop-tools [data-reset]{grid-column:1/-1;grid-row:1;justify-self:center}.crop-tools .crop-arrows{grid-column:1;grid-row:2;justify-self:start}.crop-tools [data-save]{grid-column:2;grid-row:2;justify-self:end}}
 
+.medal-arcs{display:grid;gap:12px;margin:16px 0;padding:16px;border:1px solid var(--line,#dbe2e9);border-radius:12px}.center-choice{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.center-choice [aria-pressed="true"],.toolbar-auto[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.reverse-option{margin:16px 0}.reverse-option summary{cursor:pointer;font-weight:600;padding:10px 0}.medal-arcs .line-toolbar{flex-wrap:wrap!important;overflow:visible}
 </style>
 <script defer src="assets/stats.js?v=1"></script>
 </head>
@@ -323,7 +325,7 @@ Kategoria: SENIOR
           <p class="help-note">Generator pomaga też automatycznie: gdy w całym tekście nie ma gwiazdek, pogrubia rozpoznane nagłówki zapisane wielkimi literami, np. „I MIEJSCE”. Gdy nie ma znaku @, próbuje rozpoznać miejscowość i datę w ostatniej linii.</p>
         </div>
       </details>
-      <p class="type-help">Medal: wpisz <code>medal 27mm</code>, <code>medal 41mm</code> lub <code>medal 52mm</code>, a w kolejnych liniach tekst. Liczbę kopii dodaj np. <code>medal 41mm 24szt</code>.</p>
+      <p class="type-help">Medal: wpisz <code>medal 27mm</code>, <code>medal 41mm</code> lub <code>medal 52mm</code>, a w kolejnych liniach tekst. Medale z napisami po okręgu lub logo edytuj w zakładce „Wpisuję po kolei”; pozostają zachowane przy wklejaniu tekstu. Liczbę kopii dodaj np. <code>medal 41mm 24szt</code>.</p>
 <label class="f" for="src"><span>Tekst blaszek</span></label>
       <textarea id="src" spellcheck="false"></textarea>
     </div>
