@@ -218,11 +218,11 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 .page-nav{margin-top:14px!important}
 @media(min-width:1101px){.right{max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
 @media(max-width:1100px){.sheet{width:min(100%,640px)}}
-/* Full supplied logo, preserving its proportions on every screen. */
-.brand-full{flex:0 1 345px;width:100%;max-width:345px;min-width:0}
+/* Compact visible header logo; favicon/share icons stay unchanged. */
+.brand-full{flex:0 1 430px;width:100%;max-width:430px;min-width:0}
 .brand-heading{width:100%;margin:0;line-height:0}
-.brand-full-logo{display:block;width:100%;height:auto;margin:-5.8% 0;transform:translateX(-3.2%)}
-@media(max-width:560px){.top{gap:0;padding:10px 0 8px;margin-bottom:8px}.brand-full{flex:0 1 320px;max-width:100%}.brand-full-logo{margin:-5.8% 0}.top .save-info{display:none}.top .save-info small{font-size:12px}}
+.brand-full-logo{display:block;width:100%;height:auto;margin:0;transform:none}
+@media(max-width:560px){.top{gap:0;padding:8px 0 6px;margin-bottom:6px}.brand-full{flex:0 1 360px;max-width:100%}.brand-full-logo{margin:0}.top .save-info{display:none}.top .save-info small{font-size:12px}}
 
 /* Keep dimension inputs aligned when validation messages appear. */
 .dims{align-items:start;grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -252,7 +252,7 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 <body>
 <header class="top">
   <div class="brand brand-full">
-    <h1 class="brand-heading"><img class="brand-full-logo" src="assets/logo-generator-blaszek.png?v=3" width="2048" height="686" alt="Generator Blaszek — Szybko i łatwo twórz blaszki ze spersonalizowanym napisem. by Dawid Tokarski" fetchpriority="high"></h1>
+    <h1 class="brand-heading"><img class="brand-full-logo" src="assets/logo-header-compact.png?v=1" width="1807" height="245" alt="Generator Blaszek by Dawid Tokarski" fetchpriority="high"></h1>
   </div>
   <div class="save-info"><span id="save-status" role="status">Gotowy do pracy</span><small>Dane są zapisywane w tej przeglądarce.</small></div>
 </header>
