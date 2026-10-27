@@ -218,11 +218,12 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 .page-nav{margin-top:14px!important}
 @media(min-width:1101px){.right{max-height:calc(100vh - 32px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}}
 @media(max-width:1100px){.sheet{width:min(100%,640px)}}
-/* Compact visible header logo; favicon/share icons stay unchanged. */
-.brand-full{flex:0 1 430px;width:100%;max-width:430px;min-width:0}
-.brand-heading{width:100%;margin:0;line-height:0}
-.brand-full-logo{display:block;width:100%;height:auto;margin:0;transform:none;mix-blend-mode:multiply}
-@media(max-width:560px){.top{gap:0;padding:8px 0 6px;margin-bottom:6px}.brand-full{flex:0 1 360px;max-width:100%}.brand-full-logo{margin:0}.top .save-info{display:none}.top .save-info small{font-size:12px}}
+/* Header-only wordmark. Frame the original artwork without its empty margins.
+   Visible source rectangle: x=145, y=248, width=1885, height=254. */
+.brand-full{flex:0 1 460px;width:100%;max-width:460px;min-width:0}
+.brand-heading{position:relative;overflow:hidden;width:100%;aspect-ratio:1885/254;margin:0;line-height:0;mix-blend-mode:multiply}
+.brand-full-logo{position:absolute;display:block;width:115.2255%;max-width:none;height:auto;left:-7.6923%;top:-97.6378%;margin:0;transform:none}
+@media(max-width:560px){.top{gap:0;padding:20px 0 18px;margin-bottom:8px}.brand-full{flex:0 1 380px;max-width:100%;margin-inline:auto}.top .save-info{display:none}}
 
 /* Keep dimension inputs aligned when validation messages appear. */
 .dims{align-items:start;grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -252,7 +253,7 @@ img.empty-icon{display:block;margin:0 auto;width:48px;height:48px;border-radius:
 <body>
 <header class="top">
   <div class="brand brand-full">
-    <h1 class="brand-heading"><img class="brand-full-logo" src="assets/logo-header-wordmark.webp?v=2" width="1200" height="159" alt="Generator Blaszek by Dawid Tokarski" fetchpriority="high" decoding="async"></h1>
+    <h1 class="brand-heading"><img class="brand-full-logo" src="assets/logo-header-optimized.webp" width="2172" height="724" alt="Generator Blaszek by Dawid Tokarski" fetchpriority="high" decoding="async"></h1>
   </div>
   <div class="save-info"><span id="save-status" role="status">Gotowy do pracy</span><small>Dane są zapisywane w tej przeglądarce.</small></div>
 </header>
