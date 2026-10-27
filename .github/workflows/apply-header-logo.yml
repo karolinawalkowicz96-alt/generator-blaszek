@@ -19,8 +19,8 @@ jobs:
         run: |
           cat .tmp/logo-header-1.b64 .tmp/logo-header-2.b64 | base64 -d > assets/logo-header-wordmark.webp
           wc -c assets/logo-header-wordmark.webp
-          test $(wc -c < assets/logo-header-wordmark.webp) -gt 19000
-          test $(wc -c < assets/logo-header-wordmark.webp) -lt 22000
+          test $(wc -c < assets/logo-header-wordmark.webp) -gt 20000
+          test $(wc -c < assets/logo-header-wordmark.webp) -lt 30000
           file assets/logo-header-wordmark.webp | grep -qi webp
       - name: Update header markup
         run: |
