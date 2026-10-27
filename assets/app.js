@@ -207,13 +207,13 @@ function fit(p,o){
 function fitMedal(p,o){
   const radius=safeDiameter(p)/2,center=p.w/2;
   const body=p.vis.filter(l=>!l.footer),foot=p.vis.filter(l=>l.footer);
-  function group(lines,cy,top,bottom,cap,spacing){
+  function group(lines,cy,top,bottom,cap,spacing,alignTop=false){
     if(!lines.length)return 0;
     const positions=base=>{
       const sizes=lines.map((l,i)=>lineSize(l.size)||(base*(lines===body&&i===0?1.18:1)));
-      const steps=sizes.map((z,i)=>i?Math.max(descent(lines[i-1])*sizes[i-1]+(ascent(lines[i])+.13)*z,spacing*z)+(lines===body&&i===1?z*.30:0):0);
+      const steps=sizes.map((z,i)=>i?Math.max(descent(lines[i-1])*sizes[i-1]+(ascent(lines[i])+.13)*z,spacing*z):0);
       const height=(ascent(lines[0])*sizes[0]+descent(lines.at(-1))*sizes.at(-1)+steps.reduce((a,b)=>a+b,0))*PT;
-      let y=cy-height/2+ascent(lines[0])*sizes[0]*PT;
+      let y=(alignTop?top:cy-height/2)+ascent(lines[0])*sizes[0]*PT;
       return lines.map((l,i)=>{y+=steps[i]*PT;return {size:sizes[i],y}});
     };
     const fits=ps=>ps.every((a,i)=>{
@@ -230,7 +230,9 @@ function fitMedal(p,o){
   }
   const base=group(body,p.h*(foot.length?.45:.525),p.h*.16,p.h*(foot.length?.67:.90),p.pt||p.w*.22,1.32);
   const bodySize=body.length>1?Math.max(...body.slice(1).map(l=>l.size)):base;
-  group(foot,p.h*.74,p.h*.68,p.h*.86,Math.max(.1,(bodySize||p.w*.22)-1),1.15);
+  const bodyBottom=body.length?Math.max(...body.map(l=>l.offsetY+descent(l)*l.size*PT)):p.h*.635;
+  // Anchor the first footer line to the body, regardless of footer line count.
+  group(foot,p.h*.74,bodyBottom+p.h*.045,p.h*.86,Math.max(.1,(bodySize||p.w*.22)-1),1.15,true);
   p.fs=1;p.blockH=0;p.overflow=false;p.small=false;
 }
 function linePos(p,o){
