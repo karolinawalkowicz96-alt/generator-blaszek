@@ -575,6 +575,8 @@ $('dl').addEventListener('click',async()=>{
     clearTimeout(t); await refresh(); await ensureFonts(usedFamilies()); build();
     if(!layout||!layout.pages.length) return;
     const name=fileName();
+    const stats={plates:0,medals:0,reverses:0,pages:layout.pages.length};
+    for(const item of layout.items) stats[item.shape!=='medal'?'plates':item.logo?'reverses':'medals']++;
     if(downloads){
       await downloads.save({filename:name,data:makePdf()});
       say('ok',`Gotowe! Plik <b>${esc(name)}</b> jest w folderze Pobrane.`);
@@ -583,6 +585,7 @@ $('dl').addEventListener('click',async()=>{
       await makePdfDoc().save(name,{returnPromise:true});
       say('ok',`Rozpoczęto pobieranie: <b>${esc(name)}</b>.`);
     }
+    try{window.recordGeneratorExport?.(stats)}catch{}
   }catch(e){
     const c=e&&e.code;
     say('err',c==='declined'?'Zapis anulowany. Kliknij „Pobierz PDF”, aby spróbować ponownie.':c==='rate_limited'?'Okienko zapisu jest już otwarte. Potwierdź je.':'Nie udało się zapisać pliku. Spróbuj jeszcze raz.');
