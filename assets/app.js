@@ -52,7 +52,8 @@ const ascent=l=>l.font==='vibes'?1.1:l.font==='charm'?0.95:0.72;
 const descent=l=>l.font==='vibes'?0.5:l.font==='charm'?0.35:0.22;
 const lineStep=(prev,next,a,b,o)=>Math.max(0.22*a+(o.lh-0.22)*b,descent(prev)*a+(ascent(next)+0.15)*b)+next.gap*(b/next.scale);
 const MEDAL_SIZES=[27,41,52];
-const safeDiameter=p=>({27:23.5,41:37.5,52:48.5})[p.w]||p.w-3.5;
+const MEDAL_TEXT_MARGIN_MM=2; // Safe text diameters: 23, 37 and 48 mm.
+const safeDiameter=p=>p.w-2*MEDAL_TEXT_MARGIN_MM;
 const validLogo=l=>l&&/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(l.data)&&l.w>0&&l.h>0?{data:l.data,w:l.w,h:l.h,r:Number.isFinite(l.r)&&l.r>0?l.r:Math.hypot(l.w,l.h)/2}:null;
 const itemName=p=>p.shape==='medal'?'Medal':'Blaszka';
 const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,logo:validLogo(p.logo),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
@@ -258,7 +259,8 @@ function pack(items,o){
   return {pages:sheets.map(s=>s.items),bad,sheets};
 }
 function logoBox(p){
-  const k=safeDiameter(p)/(2*(p.logo.r||Math.hypot(p.logo.w,p.logo.h)/2));
+  // The approved circular crop fills the full medal diameter, without a text margin.
+  const k=p.w/(2*(p.logo.r||Math.hypot(p.logo.w,p.logo.h)/2));
   const w=p.logo.w*k,h=p.logo.h*k;
   return {x:p.x+(p.w-w)/2,y:p.y+(p.h-h)/2,w,h};
 }
@@ -275,7 +277,7 @@ function cropLogo(img){
       <div class="crop-stage"><canvas width="600" height="600" aria-label="Podgląd kadru logo. Przeciągnij grafikę lub użyj strzałek poniżej." tabindex="0"></canvas></div>
       <label class="crop-zoom">Powiększenie <output>100%</output><input aria-label="Powiększenie logo" type="range" min="20" max="400" value="100" step="1"></label>
       <div class="crop-tools"><div class="crop-arrows" role="group" aria-label="Przesuń logo"><button type="button" class="btn" data-move="-10,0" aria-label="Przesuń w lewo">←</button><button type="button" class="btn" data-move="0,-10" aria-label="Przesuń w górę">↑</button><button type="button" class="btn" data-move="0,10" aria-label="Przesuń w dół">↓</button><button type="button" class="btn" data-move="10,0" aria-label="Przesuń w prawo">→</button></div><button type="button" class="btn" data-reset>Wyśrodkuj i dopasuj</button><button class="btn primary" type="button" data-save>Zatwierdź kadr</button></div>
-      <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. Sprawdź kadr przed zatwierdzeniem — zachowamy Twoje ustawienie i bezpieczny margines.</p>
+      <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. Zatwierdzony kadr wypełni medal aż do obramowania, bez dodatkowego marginesu.</p>
       </form>`;
     dialog.setAttribute('aria-labelledby','crop-title');document.body.append(dialog);
     const canvas=dialog.querySelector('canvas'),ctx=canvas.getContext('2d'),range=dialog.querySelector('input'),output=dialog.querySelector('output');
@@ -331,7 +333,7 @@ function cardHtml(p){
         <label class="f n"><span>Liczba sztuk</span><input type="number" inputmode="numeric" step="1" min="1" id="c-${p.id}" value="${p.copies}" data-act="copies"></label>
       </div>
     </div>
-    ${p.shape==='medal'?`<div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr z bezpiecznym marginesem.':'Wybierz grafikę i przytnij ją w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div>`:''}
+    ${p.shape==='medal'?`<div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr wypełnia cały medal, aż do obramowania.':'Wybierz grafikę i przytnij ją w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div>`:''}
     <div class="lines" ${p.logo?'hidden':''}>
       <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Puste pole rozmiaru = Auto. Wpisz wartość, aby powiększyć lub pomniejszyć linię. Przycisk Auto przywraca dopasowanie.</p>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
