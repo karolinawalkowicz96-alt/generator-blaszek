@@ -4,26 +4,26 @@ import vm from 'node:vm';
 import {readFileSync} from 'node:fs';
 const source=readFileSync(new URL('../assets/app.js',import.meta.url),'utf8').split('/* ---------- step 1: cards ---------- */')[0];
 const context=vm.createContext({document:{getElementById:()=>null},console});
-vm.runInContext(source+`;measurer={size:1,setFont(){},setFontSize(s){this.size=s},getTextWidth(t){return Array.from(t).length*this.size*PT*.6}};globalThis.api={mk,fit,fitArcs,centerLogoBox,plateLogoLayout,linePos};`,context);
-const {mk,fit,fitArcs,centerLogoBox,plateLogoLayout,linePos}=context.api;
+vm.runInContext(source+`;measurer={size:1,setFont(){},setFontSize(s){this.size=s},getTextWidth(t){return Array.from(t).length*this.size*PT*.6}};globalThis.api={mk,fit,fitArcs,centerLogoBox,plateLogoLayout,linePos,safeDiameter,parseSize,logoBox};`,context);
+const {mk,fit,fitArcs,centerLogoBox,plateLogoLayout,linePos,safeDiameter,parseSize,logoBox}=context.api;
 test('both arcs remain centered and shrink to fit all medal sizes',()=>{
-  for(const w of [27,41,52])for(const text of ['A','ZA ZASŁUGI','ĄĆĘŁŃÓŚŹŻ '.repeat(30)]){
+  for(const w of [26.5,40.5,51.5])for(const text of ['A','ZA ZASŁUGI','ĄĆĘŁŃÓŚŹŻ '.repeat(30)]){
     const p=mk({shape:'medal',w,arcTop:{text},arcBottom:{text},lines:[]});fitArcs(p);
     assert.ok(p.centerDiameter>0);
     for(const key of ['arcTop','arcBottom']){
       const glyphs=p.arcGlyphs.filter(g=>g.key===key);
       assert.ok(Math.abs(glyphs[0].dx+glyphs.at(-1).dx)<1e-8);
-      for(const g of glyphs){assert.ok(g.size>0);assert.ok(Math.hypot(g.dx,g.dy)<w/2-2)}
+      for(const g of glyphs){assert.ok(g.size>0);assert.ok(Math.hypot(g.dx,g.dy)<w/2-1.5)}
     }
   }
 });
 test('center logo stays inside the reserved area and survives copying',()=>{
-  const p=mk({shape:'medal',w:41,centerMode:'logo',centerLogo:{data:'data:image/png;base64,AAAA',w:1000,h:1000,r:500},arcTop:{text:'ZASŁUGI'},lines:[{text:'Zachowany tekst'}]});
+  const p=mk({shape:'medal',w:40.5,centerMode:'logo',centerLogo:{data:'data:image/png;base64,AAAA',w:1000,h:1000,r:500},arcTop:{text:'ZASŁUGI'},lines:[{text:'Zachowany tekst'}]});
   const copy=mk(JSON.parse(JSON.stringify(p)));assert.equal(copy.centerLogo.data,p.centerLogo.data);assert.equal(copy.lines[0].text,'Zachowany tekst');
-  fit(copy,{});copy.x=copy.y=7;const box=centerLogoBox(copy);assert.equal(box.w,copy.centerDiameter);assert.ok(box.w<copy.w-4);assert.equal(copy.vis.length,0);
+  fit(copy,{});copy.x=copy.y=7;const box=centerLogoBox(copy);assert.equal(box.w,copy.centerDiameter);assert.ok(box.w<copy.w-3);assert.equal(copy.vis.length,0);
 });
 test('center text remains inside the circle reserved between the arcs',()=>{
-  const p=mk({shape:'medal',w:27,arcTop:{text:'MEDAL'},arcBottom:{text:'ZA ZASŁUGI'},lines:[{text:'DLA'},{text:'Długi tekst w środku'}]});fit(p,{});
+  const p=mk({shape:'medal',w:26.5,arcTop:{text:'MEDAL'},arcBottom:{text:'ZA ZASŁUGI'},lines:[{text:'DLA'},{text:'Długi tekst w środku'}]});fit(p,{});
   assert.equal(p.vis.length,2);
   const top=(p.w-p.centerDiameter)/2;
   for(const l of p.vis){assert.ok(l.offsetY>=top);assert.ok(l.offsetY<p.w-top)}
@@ -42,15 +42,24 @@ test('corner logos keep proportions, safe inset and do not overlap fitted text',
   }
 });
 test('center slider grows text, leaves arcs alone and stops at the safe circle',()=>{
-  for(const w of [27,41,52])for(const arc of ['', 'ZA ZASŁUGI']){
+  for(const w of [26.5,40.5,51.5])for(const arc of ['', 'ZA ZASŁUGI']){
     const source={shape:'medal',w,arcTop:{text:arc},arcBottom:{text:arc},lines:[{text:'DLA'},{text:'JANA'}],footer:'2026'};
     const small=mk({...source,centerScale:.5}),base=mk(source),large=mk({...source,centerScale:2});
     for(const p of [small,base,large])fit(p,options);
     assert.ok(small.vis[0].size<base.vis[0].size);
     assert.ok(large.vis[0].size>base.vis[0].size);
     assert.deepEqual(large.arcGlyphs,base.arcGlyphs);
-    const r=(arc?large.centerDiameter:w-4)/2,c=w/2;
+    const r=(arc?large.centerDiameter:w-3)/2,c=w/2;
     for(const l of large.vis){const top=l.offsetY-.72*l.size*25.4/72,bottom=l.offsetY+.22*l.size*25.4/72;const edge=Math.max(Math.abs(top-c),Math.abs(bottom-c));const width=l.text.length*l.size*25.4/72*.6;assert.ok(Math.hypot(width/2,edge)<=r+1e-6)}
     assert.equal(mk(JSON.parse(JSON.stringify(large))).centerScale,2);
   }
+});
+
+test('new medal sizes, saved-size migration and 3 mm diameter allowance',()=>{
+ for(const [old,w,safe] of [[27,26.5,23.5],[41,40.5,37.5],[52,51.5,48.5]]){
+  const p=mk({shape:'medal',w:old,lines:[]});assert.equal(p.w,w);assert.equal(p.h,w);assert.equal(safeDiameter(p),safe);
+  for(const text of [`medal ${w}mm`,`medal ${String(w).replace('.',',')}mm`,`medal ${old}mm`])assert.equal(parseSize(text).w,w);
+  const reverse=mk({shape:'medal',w,logo:{...logo,w:1000,h:1000,r:500},lines:[]});reverse.x=reverse.y=0;
+  const box=logoBox(reverse);assert.equal(box.w,w);assert.equal(box.h,w);assert.equal(box.x,0);assert.equal(box.y,0);
+ }
 });

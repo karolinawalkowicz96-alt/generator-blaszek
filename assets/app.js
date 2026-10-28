@@ -51,8 +51,9 @@ const fontStyle=l=>l.bold&&l.font!=='vibes'?'bold':'normal';
 const ascent=l=>l.font==='vibes'?1.1:l.font==='charm'?0.95:0.72;
 const descent=l=>l.font==='vibes'?0.5:l.font==='charm'?0.35:0.22;
 const lineStep=(prev,next,a,b,o)=>Math.max(0.22*a+(o.lh-0.22)*b,descent(prev)*a+(ascent(next)+0.15)*b)+next.gap*(b/next.scale);
-const MEDAL_SIZES=[27,41,52];
-const MEDAL_TEXT_MARGIN_MM=2; // Safe text diameters: 23, 37 and 48 mm.
+const MEDAL_SIZES=[26.5,40.5,51.5];
+const medalSize=v=>({27:26.5,41:40.5,52:51.5})[num(v)]||(MEDAL_SIZES.includes(num(v))?num(v):26.5);
+const MEDAL_TEXT_MARGIN_MM=1.5; // 3 mm off the diameter: safe fields 23.5, 37.5, 48.5 mm.
 const safeDiameter=p=>p.w-2*MEDAL_TEXT_MARGIN_MM;
 const cleanLine=l=>({text:String(l?.text||''),bold:!!l?.bold,italic:!!l?.italic,color:okCol(l?.color),size:lineSize(l?.size),font:fontKey(l?.font)});
 const editLine=(p,key)=>key==='arcTop'||key==='arcBottom'?p[key]:p.lines[+key];
@@ -63,7 +64,7 @@ const hasCornerLogos=p=>p.shape!=='medal'&&!!(p.leftLogo||p.rightLogo);
 
 const validLogo=l=>l&&/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(l.data)&&l.w>0&&l.h>0?{data:l.data,w:l.w,h:l.h,r:Number.isFinite(l.r)&&l.r>0?l.r:Math.hypot(l.w,l.h)/2}:null;
 const itemName=p=>p.shape==='medal'?'Medal':'Blaszka';
-const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.w,h:p.shape==='medal'?(MEDAL_SIZES.includes(+p.w)?+p.w:27):p.h,copies:p.copies||1,logo:validLogo(p.logo),centerLogo:validLogo(p.centerLogo),leftLogo:validLogo(p.leftLogo),rightLogo:validLogo(p.rightLogo),centerScale:centerScale(p.centerScale),centerMode:p.centerMode==='logo'?'logo':'text',arcTop:cleanLine(p.arcTop),arcBottom:cleanLine(p.arcBottom),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
+const mk=p=>({id:uid++,shape:p.shape==='medal'?'medal':'plate',w:p.shape==='medal'?medalSize(p.w):p.w,h:p.shape==='medal'?medalSize(p.w):p.h,copies:p.copies||1,logo:validLogo(p.logo),centerLogo:validLogo(p.centerLogo),leftLogo:validLogo(p.leftLogo),rightLogo:validLogo(p.rightLogo),centerScale:centerScale(p.centerScale),centerMode:p.centerMode==='logo'?'logo':'text',arcTop:cleanLine(p.arcTop),arcBottom:cleanLine(p.arcBottom),pt:p.pt||null,footer:p.footer||'',footerColor:okCol(p.footerColor),lines:(p.lines||[]).map(l=>({text:l.text,bold:!!l.bold,italic:!!l.italic,color:okCol(l.color),size:lineSize(l.size),font:fontKey(l.font)}))});
 let plates=[];
 const KEY='blaszki-state-v3';
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(plates.map(({id,...r})=>r)));localStorage.setItem(KEY+'-options',JSON.stringify(opts()));$('save-status').textContent='Zapisano w przeglądarce'}catch(e){$('save-status').textContent='Nie udało się zapisać danych'}}
@@ -105,8 +106,8 @@ function readMarks(str){
 }
 const SIZE_RE=/^\s*(\d+(?:[.,]\d+)?)\s*([x×X*\/])\s*(\d+(?:[.,]\d+)?)\s*(mm|cm)?(.*)$/i;
 function parseSize(s){
-  const medal=s.match(/^\s*medal\s+(27|41|52)\s*(?:mm)?(?:\s+(\d+)\s*szt)?(?:\s+(\d+(?:[.,]\d+)?)\s*pt)?\s*$/i);
-  if(medal)return {shape:'medal',w:+medal[1],h:+medal[1],copies:+medal[2]||1,pt:medal[3]?num(medal[3]):null};
+  const medal=s.match(/^\s*medal\s+(26[.,]5|40[.,]5|51[.,]5|27|41|52)\s*(?:mm)?(?:\s+(\d+)\s*szt)?(?:\s+(\d+(?:[.,]\d+)?)\s*pt)?\s*$/i);
+  if(medal)return {shape:'medal',w:medalSize(medal[1]),h:medalSize(medal[1]),copies:+medal[2]||1,pt:medal[3]?num(medal[3]):null};
   const m=s.match(SIZE_RE); if(!m) return null;
   const rest=m[5]||'';
   if(rest.trim() && !/^(\s*(\d+\s*szt\.?|x\s*\d+|\d+(?:[.,]\d+)?\s*pt))*\s*$/i.test(rest)) return null;
@@ -433,7 +434,7 @@ function cardHtml(p){
     <div class="plate-h">
       <h3 class="plate-title">${itemName(p)} ${i}${p.logo?' · logo / rewers':''}</h3>
       <div class="dims ${p.shape==='medal'?'medal-dims':''}">
-        ${p.shape==='medal'?`<label class="f"><span>Średnica (mm)</span><select data-act="diameter" aria-label="Średnica medalu">${MEDAL_SIZES.map(d=>`<option value="${d}" ${d===p.w?'selected':''}>${d} mm</option>`).join('')}</select></label>`:`
+        ${p.shape==='medal'?`<label class="f"><span>Średnica (mm)</span><select data-act="diameter" aria-label="Średnica medalu">${MEDAL_SIZES.map(d=>`<option value="${d}" ${d===p.w?'selected':''}>${fmt(d)} mm</option>`).join('')}</select></label>`:`
         <label class="f n"><span>Szerokość (mm)</span><input type="number" inputmode="decimal" step="0.5" min="1" id="w-${p.id}" value="${p.w}" data-act="w"></label>
         <span class="times" aria-hidden="true">×</span>
         <label class="f n"><span>Wysokość (mm)</span><input type="number" inputmode="decimal" step="0.5" min="1" id="h-${p.id}" value="${p.h}" data-act="h"></label>`}
@@ -442,7 +443,7 @@ function cardHtml(p){
     </div>
     ${p.shape==='medal'&&!p.logo?`<section class="medal-arcs"><strong>Napisy po okręgu (opcjonalnie)</strong><p class="type-help">Góra i dół wyśrodkują się automatycznie. Długi napis zmniejszy się, aby zmieścić się na łuku.</p>${lineRow(p,'arcTop')}${lineRow(p,'arcBottom')}<div class="center-choice" role="group" aria-label="Środek medalu"><span>Środek medalu:</span><button class="btn" type="button" data-act="center-text" aria-pressed="${p.centerMode!=='logo'}">Tekst</button><button class="btn" type="button" data-act="center-logo" aria-pressed="${p.centerMode==='logo'}">Logo</button></div>${p.centerMode==='logo'?`<div class="medal-logo"><p class="type-help">Logo dopasuje się do wolnego środka i nie nachodzi na napisy. Wybierz PNG, JPG, WebP lub PDF, przesuń logo i zatwierdź kadr.</p><button class="btn" type="button" data-act="add-center-logo">${p.centerLogo?'Zmień / przytnij logo':'Wybierz logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" data-act="center-logo-file" aria-label="Logo w środku medalu"></div>`:''}</section>`:''}
     <div class="lines" ${p.logo||p.centerMode==='logo'?'hidden':''}>
-      <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Użyj − i +, aby zmienić rozmiar. Auto przywraca automatyczne dopasowanie.</p>
+      <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
       ${p.shape==='medal'?`<div class="center-scale"><label for="scale-${p.id}">Rozmiar środka <output data-scale-value>${Math.round(centerScale(p.centerScale)*100)}%</output></label><div><input id="scale-${p.id}" type="range" min="50" max="200" step="1" value="${Math.round(centerScale(p.centerScale)*100)}" data-act="center-scale" aria-describedby="scale-help-${p.id}"><button type="button" class="btn" data-act="reset-center-scale">Auto</button></div><small id="scale-help-${p.id}">Powiększa całą treść środka. Zachowuje odstęp od łuków i krawędzi.<span data-scale-limit></span></small></div>`:''}
     </div>
@@ -540,7 +541,7 @@ $('add-plate').addEventListener('click',()=>{
 });
 
 $('add-medal').addEventListener('click',()=>{
-  const p=mk({shape:'medal',w:27,h:27,lines:[{text:'',bold:false}]});
+  const p=mk({shape:'medal',w:26.5,h:26.5,lines:[{text:'',bold:false}]});
   plates.push(p);renderCards();changed();flash(p,true);focusLine(p,0);
 });
 
