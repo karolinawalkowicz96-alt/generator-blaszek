@@ -1,1 +1,43 @@
-{"rewrites":[{"source":"/admin","destination":"/admin.html"}],"headers":[{"source":"/admin","headers":[{"key":"X-Robots-Tag","value":"noindex, nofollow"},{"key":"Cache-Control","value":"no-store"}]},{"source":"/admin.html","headers":[{"key":"X-Robots-Tag","value":"noindex, nofollow"}]},{"source":"/api/(.*)","headers":[{"key":"Cache-Control","value":"no-store"}]}]}
+{
+  "rewrites": [
+    {
+      "source": "/admin",
+      "destination": "/admin.html"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/admin",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/admin.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    }
+  ],
+  "buildCommand": "node scripts/build.mjs",
+  "outputDirectory": "dist"
+}
