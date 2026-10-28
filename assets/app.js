@@ -317,7 +317,9 @@ function logoBox(p){
 }
 // The crop preview and export use exactly the same transform and circular mask.
 async function readLogo(file,center=false){
-  if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Wybierz plik PNG, JPG lub WebP.');
+  if(!file)throw Error('Wybierz plik PNG, JPG, WebP lub PDF.');
+  if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){const {readPdfLogo}=await import('./pdf-logo.js?v=1');const img=await readPdfLogo(file);return img?await cropLogo(img,center):null}
+  if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Wybierz plik PNG, JPG, WebP lub PDF.');
   const url=URL.createObjectURL(file),img=new Image();
   try{img.src=url;await img.decode();return await cropLogo(img,center)}finally{URL.revokeObjectURL(url)}
 }
@@ -385,7 +387,7 @@ function cardHtml(p){
         <label class="f n"><span>Liczba sztuk</span><input type="number" inputmode="numeric" step="1" min="1" id="c-${p.id}" value="${p.copies}" data-act="copies"></label>
       </div>
     </div>
-    ${p.shape==='medal'&&!p.logo?`<section class="medal-arcs"><strong>Napisy po okręgu (opcjonalnie)</strong><p class="type-help">Góra i dół wyśrodkują się automatycznie. Długi napis zmniejszy się, aby zmieścić się na łuku.</p>${lineRow(p,'arcTop')}${lineRow(p,'arcBottom')}<div class="center-choice" role="group" aria-label="Środek medalu"><span>Środek medalu:</span><button class="btn" type="button" data-act="center-text" aria-pressed="${p.centerMode!=='logo'}">Tekst</button><button class="btn" type="button" data-act="center-logo" aria-pressed="${p.centerMode==='logo'}">Logo</button></div>${p.centerMode==='logo'?`<div class="medal-logo"><p class="type-help">Logo dopasuje się do wolnego środka i nie nachodzi na napisy. Wybierz grafikę, przesuń ją i zatwierdź kadr.</p><button class="btn" type="button" data-act="add-center-logo">${p.centerLogo?'Zmień / przytnij logo':'Wybierz logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="center-logo-file" aria-label="Logo w środku medalu"></div>`:''}</section>`:''}
+    ${p.shape==='medal'&&!p.logo?`<section class="medal-arcs"><strong>Napisy po okręgu (opcjonalnie)</strong><p class="type-help">Góra i dół wyśrodkują się automatycznie. Długi napis zmniejszy się, aby zmieścić się na łuku.</p>${lineRow(p,'arcTop')}${lineRow(p,'arcBottom')}<div class="center-choice" role="group" aria-label="Środek medalu"><span>Środek medalu:</span><button class="btn" type="button" data-act="center-text" aria-pressed="${p.centerMode!=='logo'}">Tekst</button><button class="btn" type="button" data-act="center-logo" aria-pressed="${p.centerMode==='logo'}">Logo</button></div>${p.centerMode==='logo'?`<div class="medal-logo"><p class="type-help">Logo dopasuje się do wolnego środka i nie nachodzi na napisy. Wybierz PNG, JPG, WebP lub PDF, przesuń logo i zatwierdź kadr.</p><button class="btn" type="button" data-act="add-center-logo">${p.centerLogo?'Zmień / przytnij logo':'Wybierz logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" data-act="center-logo-file" aria-label="Logo w środku medalu"></div>`:''}</section>`:''}
     <div class="lines" ${p.logo||p.centerMode==='logo'?'hidden':''}>
       <div class="lines-label">Treść ${p.shape==='medal'?'medalu':'blaszki'}</div><p class="type-help" id="size-help-${p.id}">Użyj − i +, aby zmienić rozmiar. Auto przywraca automatyczne dopasowanie.</p>
       ${p.lines.map((_,li)=>lineRow(p,li)).join('')}
@@ -397,7 +399,7 @@ function cardHtml(p){
         ${p.shape==='medal'?`<small id="footer-help-${p.id}" class="footer-help">Enter dodaje kolejną linię dolnego napisu.</small>`:''}
       </div>
     </div>
-    ${p.shape==='medal'?`<details class="reverse-option" ${p.logo?'open':''}><summary>Osobny rewers z logo</summary><div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr wypełnia cały medal, aż do obramowania.':'Wybierz grafikę i przytnij ją w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp" data-act="logo-file" aria-label="Wybierz logo"></div></details>`:''}
+    ${p.shape==='medal'?`<details class="reverse-option" ${p.logo?'open':''}><summary>Osobny rewers z logo</summary><div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr wypełnia cały medal, aż do obramowania.':'Wybierz PNG, JPG, WebP lub PDF i przytnij logo w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" data-act="logo-file" aria-label="Wybierz logo"></div></details>`:''}
     <div class="plate-warn" data-warn hidden></div>
     <div class="row">
       <button type="button" class="btn" data-act="add-line" ${p.logo||p.centerMode==='logo'?'hidden':''}>Dodaj linię</button>
@@ -424,12 +426,13 @@ $('cards').addEventListener('change',async e=>{
   if(!['logo-file','center-logo-file'].includes(e.target.dataset.act))return;
   const center=e.target.dataset.act==='center-logo-file';
   const input=e.target,p=byId(input.closest('.plate').dataset.id),file=input.files[0];if(!file)return;
-  try{const logo=await readLogo(file,center);if(!logo||!plates.includes(p))return;
+  input.disabled=true;toast('Wczytywanie logo…');
+  try{const logo=await readLogo(file,center);if(!logo){toast('Anulowano wczytywanie logo.');return}if(!plates.includes(p))return;
     if(center){p.centerLogo=logo;p.centerMode='logo';rerenderCard(p);changed()}
     else if(p.logo){p.logo=logo;rerenderCard(p);changed()}
     else{const back=mk({shape:'medal',w:p.w,copies:p.copies,logo,lines:[]});plates.splice(plates.indexOf(p)+1,0,back);renderCards();changed();flash(back,true)}
     toast(center?'Logo dopasowane do środka medalu.':'Logo dopasowane. Rewers jest osobnym elementem do wydruku.');
-  }catch(err){toast(err.message||'Nie udało się odczytać logo. Spróbuj innego pliku.')}finally{input.value=''}
+  }catch(err){toast(err.message||'Nie udało się odczytać logo. Spróbuj innego pliku.')}finally{input.value='';input.disabled=false}
 });
 $('cards').addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.dataset.act==='text'&&!e.target.closest('.medal-arcs')){

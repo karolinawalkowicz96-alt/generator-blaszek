@@ -1,0 +1,5 @@
+
+node_modules/
+assets/pdfjs/
+check-local.html
+check-pdf.html
