@@ -372,23 +372,24 @@ async function readCornerLogo(file){
   if(right<left){left=top=0;right=canvas.width-1;bottom=canvas.height-1}
   const out=document.createElement('canvas');out.width=right-left+1;out.height=bottom-top+1;
   out.getContext('2d').drawImage(canvas,left,top,out.width,out.height,0,0,out.width,out.height);
-  return {data:out.toDataURL('image/png'),w:out.width,h:out.height};
+  const {loadLogoImage}=await import('./logo-compat.js?v=1');
+  return cropLogo(await loadLogoImage(out.toDataURL('image/png')),false,true);
 }
-function cropLogo(img,center=false){
+function cropLogo(img,center=false,corner=false){
   return new Promise(resolve=>{
     const dialog=document.createElement('dialog');dialog.className='crop-dialog';
-    dialog.innerHTML=`<form method="dialog"><div class="crop-heading"><div><h2 id="crop-title">Dopasuj logo do medalu</h2><p>Przesuń grafikę i ustaw powiększenie.</p></div><button class="btn" value="cancel" aria-label="Zamknij kadrowanie">×</button></div>
+    dialog.innerHTML=`<form method="dialog"><div class="crop-heading"><div><h2 id="crop-title">Dopasuj logo do ${corner?'blaszki':'medalu'}</h2><p>Przesuń grafikę i ustaw powiększenie.</p></div><button class="btn" value="cancel" aria-label="Zamknij kadrowanie">×</button></div>
       <div class="crop-stage"><canvas width="600" height="600" aria-label="Podgląd kadru logo. Przeciągnij grafikę lub użyj strzałek poniżej." tabindex="0"></canvas></div>
       <label class="crop-zoom">Powiększenie <output>100%</output><input aria-label="Powiększenie logo" type="range" min="20" max="400" value="100" step="1"></label>
       <div class="crop-tools"><div class="crop-arrows" role="group" aria-label="Przesuń logo"><button type="button" class="btn" data-move="-10,0" aria-label="Przesuń w lewo">←</button><button type="button" class="btn" data-move="0,-10" aria-label="Przesuń w górę">↑</button><button type="button" class="btn" data-move="0,10" aria-label="Przesuń w dół">↓</button><button type="button" class="btn" data-move="10,0" aria-label="Przesuń w prawo">→</button></div><button type="button" class="btn" data-reset>Wyśrodkuj i dopasuj</button><button class="btn primary" type="button" data-save>Zatwierdź kadr</button></div>
-      <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. ${center?'Logo zostanie dopasowane do środka medalu, z odstępem od napisów po łuku.':'Zatwierdzony kadr wypełni medal aż do obramowania, bez dodatkowego marginesu.'}</p>
+      <p class="crop-note">${corner?'Na blaszce znajdzie się dokładnie to, co widzisz w kwadracie. Przesuń i powiększ logo; zachowamy bezpieczny odstęp od krawędzi blaszki.':`Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. ${center?'Logo zostanie dopasowane do środka medalu, z odstępem od napisów po łuku.':'Zatwierdzony kadr wypełni medal aż do obramowania, bez dodatkowego marginesu.'}`}</p>
       </form>`;
     dialog.setAttribute('aria-labelledby','crop-title');document.body.append(dialog);
     if(window.logoDialogPolyfill)window.logoDialogPolyfill.registerDialog(dialog);
     const canvas=dialog.querySelector('canvas'),ctx=canvas.getContext('2d'),range=dialog.querySelector('input'),output=dialog.querySelector('output');
     let dx=0,dy=0,zoom=1,drag=null,done=false;
     const base=600/Math.max(img.naturalWidth,img.naturalHeight);
-    function paint(target,size,preview){const c=target.getContext('2d'),k=size/600;c.clearRect(0,0,size,size);c.save();c.beginPath();c.arc(size/2,size/2,size/2,0,Math.PI*2);c.clip();c.fillStyle='#fff';c.fillRect(0,0,size,size);const w=img.naturalWidth*base*zoom*k,h=img.naturalHeight*base*zoom*k;c.drawImage(img,size/2+dx*k-w/2,size/2+dy*k-h/2,w,h);c.restore();if(preview){c.strokeStyle='#245cc7';c.lineWidth=3;c.beginPath();c.arc(size/2,size/2,size/2-2,0,Math.PI*2);c.stroke()}}
+    function paint(target,size,preview){const c=target.getContext('2d'),k=size/600;c.clearRect(0,0,size,size);c.save();c.beginPath();if(corner)c.rect(0,0,size,size);else c.arc(size/2,size/2,size/2,0,Math.PI*2);c.clip();c.fillStyle='#fff';c.fillRect(0,0,size,size);const w=img.naturalWidth*base*zoom*k,h=img.naturalHeight*base*zoom*k;c.drawImage(img,size/2+dx*k-w/2,size/2+dy*k-h/2,w,h);c.restore();if(preview){c.strokeStyle='#245cc7';c.lineWidth=3;c.beginPath();if(corner)c.rect(1.5,1.5,size-3,size-3);else c.arc(size/2,size/2,size/2-2,0,Math.PI*2);c.stroke()}}
     function draw(){paint(canvas,600,true);output.textContent=Math.round(zoom*100)+'%';range.value=Math.round(zoom*100)}
     range.oninput=()=>{zoom=+range.value/100;draw()};
     canvas.onpointerdown=e=>{drag={x:e.clientX,y:e.clientY};canvas.setPointerCapture(e.pointerId)};
@@ -454,9 +455,9 @@ function cardHtml(p){
     </div>
     ${p.shape==='medal'?`<details class="reverse-option" ${p.logo?'open':''}><summary>Osobny rewers z logo</summary><div class="medal-logo"><div><strong>${p.logo?'Logo na rewers':'Logo na drugą stronę medalu'}</strong><p class="type-help">${p.logo?'Twój zatwierdzony kadr wypełnia cały medal, aż do obramowania.':'Wybierz PNG, JPG, WebP lub PDF i przytnij logo w okienku. Powstanie osobny medal z logo, w tym samym rozmiarze i liczbie sztuk.'}</p></div><button class="btn medal-add" type="button" data-act="add-logo">${p.logo?'Zmień logo':'Dodaj logo'}</button><input hidden type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" data-act="logo-file" aria-label="Wybierz logo"></div></details>`:''}
     <div class="plate-warn" data-warn hidden></div>
-    <div class="row">
+    <div class="row ${p.shape!=='medal'?'plate-actions':''}">
       <button type="button" class="btn" data-act="add-line" ${p.logo||p.centerMode==='logo'?'hidden':''}>Dodaj linię</button>
-      ${p.shape!=='medal'?['left','right'].map(side=>{const key=side+'Logo',label=side==='left'?'lewe':'prawe';return `<span class="corner-control"><button type="button" class="btn corner-add" data-act="add-corner-logo" data-side="${side}" title="Logo w ${side==='left'?'lewym':'prawym'} górnym rogu — PNG, JPG, WebP lub PDF">${p[key]?`<img src="${p[key].data}" alt="">`:''}Logo ${label}</button>${p[key]?`<button type="button" class="btn danger corner-remove" data-act="remove-corner-logo" data-side="${side}" aria-label="Usuń ${label} logo">×</button>`:''}<input hidden type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" data-act="corner-logo-file" data-side="${side}" aria-label="Logo ${label} w górnym rogu"></span>`}).join(''):''}
+      ${p.shape!=='medal'?['left','right'].map(side=>{const key=side+'Logo',label=side==='left'?'lewe':'prawe';return `<span class="corner-control"><button type="button" class="btn corner-add ${p[key]?'has-logo':''}" data-act="add-corner-logo" data-side="${side}" title="Logo w ${side==='left'?'lewym':'prawym'} górnym rogu — PNG, JPG, WebP lub PDF">${icon('plus')}Dodaj <strong>${side==='left'?'LL':'LP'}</strong></button>${p[key]?`<button type="button" class="btn danger corner-remove" data-act="remove-corner-logo" data-side="${side}" aria-label="Usuń ${label} logo">×</button>`:''}<input hidden type="file" accept="image/png,image/jpeg,image/webp,application/pdf,.pdf" data-act="corner-logo-file" data-side="${side}" aria-label="Logo ${label} w górnym rogu"></span>`}).join(''):''}
       <button type="button" class="btn" data-act="dup">Duplikuj</button>
       ${p.shape==='medal'?'<button type="button" class="btn" data-act="fill-sheet">Zapełnij całą kartkę</button>':''}
       <button type="button" class="btn danger" data-act="del">Usuń ${p.shape==='medal'?'medal':'blaszkę'}</button>
