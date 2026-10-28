@@ -180,7 +180,7 @@ function fit(p,o){
   if(medal){if(hasArcs(p)){const d=p.centerDiameter;const inner={...p,w:d,h:d};fitMedal(inner,o);p.vis=inner.vis.map(l=>({...l,offsetY:l.offsetY+(p.w-d)/2}));p.fs=inner.fs;p.overflow=false;p.small=false}else fitMedal(p,o);scaleMedalCenter(p);return}
   const diameter=safeDiameter(p);
   const inset=medal?(p.w-diameter)/2:0;
-  const corners=plateLogoLayout(p,o);p.textTop=corners.textTop;p.textBottom=p.h-o.pady;
+  const corners=plateLogoLayout(p,o);p.textTop=o.pady;p.textBottom=p.h-o.pady;
   const availW=p.w-2*(medal?inset:o.padx), availH=p.textBottom-p.textTop;
   const sizes=base=>lines.map(l=>lineSize(l.size)||(medal?Math.min(base*l.scale,availW/Math.max(0.001,textW(l.text,l.bold,1,l.italic,l.font))):base*l.scale));
   const height=ss=>ascent(lines[0])*ss[0]+descent(lines[n-1])*ss[n-1]+ss.slice(1).reduce((sum,z,i)=>sum+lineStep(lines[i],lines[i+1],ss[i],z,o),0);
@@ -196,10 +196,23 @@ function fit(p,o){
       return textW(l.text,l.bold,ss[i],l.italic,l.font)<=chord;
     });
   };
+  // Keep the original centered text block; only the actual corner boxes
+  // constrain a line, not an empty strip across the whole plate.
+  const logosFit=ss=>{
+    if(!corners.boxes.length)return true;
+    const gap=Math.min(1,p.h*.03);
+    let y=(p.h-height(ss)*PT)/2+ascent(lines[0])*ss[0]*PT;
+    return lines.every((l,i)=>{
+      if(i)y+=lineStep(lines[i-1],l,ss[i-1],ss[i],o)*PT;
+      const w=textW(l.text,l.bold,ss[i],l.italic,l.font),left=(p.w-w)/2,right=(p.w+w)/2;
+      const top=y-ascent(l)*ss[i]*PT,bottom=y+descent(l)*ss[i]*PT;
+      return corners.boxes.every(b=>right<=b.x-gap||left>=b.x+b.w+gap||bottom<=b.y-gap||top>=b.y+b.h+gap);
+    });
+  };
   let fs=p.pt;
   if(!fs){
     let lo=0,hi=medal?Math.max(o.max,p.w*0.55):o.max;
-    for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH&&circleFits(ss,medal?inset:Math.max(o.padx,o.pady)))lo=mid;else hi=mid}
+    for(let i=0;i<36;i++){const mid=(lo+hi)/2,ss=sizes(mid);if(width(ss)<=availW&&height(ss)*PT<=availH&&logosFit(ss)&&circleFits(ss,medal?inset:Math.max(o.padx,o.pady)))lo=mid;else hi=mid}
     fs=Math.max(0.1,Math.floor(lo*10+1e-7)/10);
   }
   let ss=sizes(fs);
@@ -210,8 +223,8 @@ function fit(p,o){
     ss=ss.map(z=>z*lo);fs*=lo;
   }
   lines.forEach((l,i)=>l.size=ss[i]);
-  p.fs=fs;p.blockH=height(ss)*PT;
-  p.overflow=(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>availH+0.01||!circleFits(ss,medal?(p.w-diameter)/2:0.3);
+  p.fs=fs;p.blockH=height(ss)*PT;p.logoOverlap=!logosFit(ss);
+  p.overflow=p.logoOverlap||(!medal&&Math.min(...ss)<4.5)||width(ss)>p.w-0.6||p.blockH>availH+0.01||!circleFits(ss,medal?(p.w-diameter)/2:0.3);
   p.small=!medal&&!p.overflow&&Math.min(...ss)<6;
 }
 // One glyph layout is shared by SVG and PDF, so both outputs have identical arcs.
@@ -268,7 +281,7 @@ function plateLogoLayout(p,o){
     const k=side/Math.max(logo.w,logo.h),w=logo.w*k,h=logo.h*k;
     boxes.push({key,logo,x:key==='leftLogo'?inset:p.w-inset-w,y:inset,w,h});
   }
-  return {boxes,textTop:Math.max(o.pady,...boxes.map(b=>b.y+b.h+Math.min(2,p.h*.06)))};
+  return {boxes,textTop:o.pady};
 }
 function scaleMedalCenter(p){
   const requested=centerScale(p.centerScale);p.appliedCenterScale=1;
@@ -650,7 +663,8 @@ function applyWarns(){
   const add=(p,t)=>{(msgs[p.id]=msgs[p.id]||new Set()).add(t)};
   layout.bad.forEach(it=>add(it.src,'Projekt nie mieści się na kartce A4. Sprawdź marginesy i wymiar.'));
   layout.items.forEach(it=>{
-    if(it.overflow) add(it.src,'Tekst wychodzi poza obramowanie. Wybierz Auto, zmniejsz ręczny rozmiar lub podziel tekst na krótsze linie.');
+    if(it.logoOverlap) add(it.src,'Tekst nachodzi na logo. Wybierz Auto lub zmniejsz ręczny rozmiar tekstu.');
+    else if(it.overflow) add(it.src,'Tekst wychodzi poza obramowanie. Wybierz Auto, zmniejsz ręczny rozmiar lub podziel tekst na krótsze linie.');
     else if(it.small) add(it.src,`Litery wyjdą małe (${fmt(it.fs)} pt). Może warto skrócić tekst.`);
   });
   plates.forEach(p=>{

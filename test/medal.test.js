@@ -63,3 +63,26 @@ test('new medal sizes, saved-size migration and 3 mm diameter allowance',()=>{
   const box=logoBox(reverse);assert.equal(box.w,w);assert.equal(box.h,w);assert.equal(box.x,0);assert.equal(box.y,0);
  }
 });
+
+test('logos do not move the centered text or shrink text that already fits between them',()=>{
+ const source={w:100,h:32,lines:[{text:'I MIEJSCE'},{text:'w Zawodach Wędkarskich'},{text:'o Puchar Wójta Gminy Suszec'},{text:'kat: SENIOR'}]};
+ const plain=mk(source),withLogos=mk({...source,leftLogo:logo,rightLogo:logo});
+ fit(plain,options);fit(withLogos,options);
+ for(const p of [plain,withLogos]){
+  p.x=p.y=0;const rows=linePos(p,options);const top=rows[0].y-.72*rows[0].size*25.4/72;
+  const last=rows.at(-1),bottom=last.y+.22*last.size*25.4/72;
+  assert.ok(Math.abs((top+bottom)/2-p.h/2)<1e-6);
+ }
+ assert.equal(withLogos.fs,plain.fs);assert.equal(withLogos.overflow,false);
+ assert.equal(withLogos.blockH,plain.blockH);
+});
+test('long top lines avoid actual corner logos while text remains centered',()=>{
+ const p=mk({w:60,h:25,leftLogo:{...logo,w:100,h:100},rightLogo:{...logo,w:100,h:100},lines:[{text:'BARDZO DŁUGI NAPIS W PIERWSZEJ LINII'},{text:'II MIEJSCE'},{text:'ZA ZASŁUGI'}]});
+ fit(p,options);p.x=p.y=0;
+ for(const l of linePos(p,options))for(const b of plateLogoLayout(p,options).boxes){
+  const width=l.text.length*l.size*25.4/72*.6,left=(p.w-width)/2,right=(p.w+width)/2;
+  const top=l.y-.72*l.size*25.4/72,bottom=l.y+.22*l.size*25.4/72,gap=Math.min(1,p.h*.03);
+  assert.ok(right<=b.x-gap+1e-6||left>=b.x+b.w+gap-1e-6||bottom<=b.y-gap+1e-6||top>=b.y+b.h+gap-1e-6);
+ }
+ assert.equal(p.logoOverlap,false);
+});
