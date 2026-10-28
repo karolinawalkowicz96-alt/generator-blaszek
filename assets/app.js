@@ -318,10 +318,11 @@ function logoBox(p){
 // The crop preview and export use exactly the same transform and circular mask.
 async function readLogo(file,center=false){
   if(!file)throw Error('Wybierz plik PNG, JPG, WebP lub PDF.');
-  if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){const {readPdfLogo}=await import('./pdf-logo.js?v=1');const img=await readPdfLogo(file);return img?await cropLogo(img,center):null}
+  const {prepareLogoDialogs,loadLogoImage}=await import('./logo-compat.js?v=1');await prepareLogoDialogs();
+  if(file.type==='application/pdf'||/\.pdf$/i.test(file.name)){const {readPdfLogo}=await import('./pdf-logo.js?v=2');const img=await readPdfLogo(file);return img?await cropLogo(img,center):null}
   if(!['image/png','image/jpeg','image/webp'].includes(file.type))throw Error('Wybierz plik PNG, JPG, WebP lub PDF.');
-  const url=URL.createObjectURL(file),img=new Image();
-  try{img.src=url;await img.decode();return await cropLogo(img,center)}finally{URL.revokeObjectURL(url)}
+  const url=URL.createObjectURL(file);
+  try{const img=await loadLogoImage(url);return await cropLogo(img,center)}finally{URL.revokeObjectURL(url)}
 }
 function cropLogo(img,center=false){
   return new Promise(resolve=>{
@@ -333,6 +334,7 @@ function cropLogo(img,center=false){
       <p class="crop-note">Na medalu znajdzie się dokładnie to, co widzisz wewnątrz koła. Wszystko poza kołem zostanie przycięte. ${center?'Logo zostanie dopasowane do środka medalu, z odstępem od napisów po łuku.':'Zatwierdzony kadr wypełni medal aż do obramowania, bez dodatkowego marginesu.'}</p>
       </form>`;
     dialog.setAttribute('aria-labelledby','crop-title');document.body.append(dialog);
+    if(window.logoDialogPolyfill)window.logoDialogPolyfill.registerDialog(dialog);
     const canvas=dialog.querySelector('canvas'),ctx=canvas.getContext('2d'),range=dialog.querySelector('input'),output=dialog.querySelector('output');
     let dx=0,dy=0,zoom=1,drag=null,done=false;
     const base=600/Math.max(img.naturalWidth,img.naturalHeight);
@@ -345,7 +347,7 @@ function cropLogo(img,center=false){
     canvas.onkeydown=e=>{const moves={ArrowLeft:[-10,0],ArrowRight:[10,0],ArrowUp:[0,-10],ArrowDown:[0,10]};if(moves[e.key]){e.preventDefault();dx+=moves[e.key][0];dy+=moves[e.key][1];draw()}};
     dialog.querySelectorAll('[data-move]').forEach(b=>b.onclick=()=>{const [x,y]=b.dataset.move.split(',').map(Number);dx+=x;dy+=y;draw()});
     dialog.querySelector('[data-reset]').onclick=()=>{dx=dy=0;zoom=1;draw()};
-    const finish=value=>{if(done)return;done=true;dialog.close();dialog.remove();resolve(value)};
+    const finish=value=>{if(done)return;done=true;if(dialog.hasAttribute('open'))dialog.close();dialog.remove();resolve(value)};
     dialog.oncancel=e=>{e.preventDefault();finish(null)};dialog.onclose=()=>finish(null);
     dialog.querySelector('[data-save]').onclick=()=>{const out=document.createElement('canvas');out.width=out.height=1000;paint(out,1000,false);finish({data:out.toDataURL('image/png'),w:1000,h:1000,r:500})};
     draw();dialog.showModal();

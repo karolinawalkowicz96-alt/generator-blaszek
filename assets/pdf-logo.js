@@ -1,9 +1,10 @@
 // PDF.js is loaded on demand; the PDF stays on the user's device.
+import {prepareLogoDialogs,readLogoBuffer,loadLogoImage} from './logo-compat.js?v=1';
 let library;
 async function pdfLibrary(){
-  library ||= import('./pdfjs/build/pdf.min.mjs').catch(error=>{library=null;throw error});
+  if(!library)library=import('./pdfjs/build/pdf.min.mjs?v=compat1').catch(error=>{library=null;throw error});
   const pdfjs=await library;
-  pdfjs.GlobalWorkerOptions.workerSrc=new URL('./pdfjs/build/pdf.worker.min.mjs',import.meta.url).href;
+  pdfjs.GlobalWorkerOptions.workerSrc=new URL('./pdfjs/build/pdf.worker.min.mjs?v=compat1',import.meta.url).href;
   return pdfjs;
 }
 async function renderPage(pdf,number){
@@ -13,7 +14,7 @@ async function renderPage(pdf,number){
   canvas.width=Math.max(1,Math.ceil(viewport.width));canvas.height=Math.max(1,Math.ceil(viewport.height));
   try{
     await page.render({canvasContext:canvas.getContext('2d'),viewport,background:'rgb(255,255,255)'}).promise;
-    const img=new Image();img.src=canvas.toDataURL('image/png');await img.decode();return img;
+    return await loadLogoImage(canvas.toDataURL('image/png'));
   }finally{page.cleanup();canvas.width=canvas.height=0}
 }
 function choosePage(pdf){
@@ -21,9 +22,10 @@ function choosePage(pdf){
     const dialog=document.createElement('dialog');dialog.className='crop-dialog';
     dialog.innerHTML=`<form method="dialog"><div class="crop-heading"><h2>Wybierz stronę PDF z logo</h2><button class="btn" value="cancel" aria-label="Anuluj wybór strony">×</button></div><label class="f">Strona PDF<input type="number" min="1" max="${pdf.numPages}" value="1" step="1"></label><p>Dokument ma ${pdf.numPages} stron.</p><div style="height:300px;display:grid;place-items:center;background:#f4f6f9"><img alt="Podgląd wybranej strony PDF" style="max-width:100%;max-height:300px;object-fit:contain"></div><p role="status"></p><button class="btn primary" type="button" data-use disabled>Dalej: przytnij logo</button></form>`;
     document.body.append(dialog);
+    if(window.logoDialogPolyfill)window.logoDialogPolyfill.registerDialog(dialog);
     const input=dialog.querySelector('input'),preview=dialog.querySelector('img'),status=dialog.querySelector('[role=status]'),use=dialog.querySelector('[data-use]');
     let seq=0,selected=null,closed=false;
-    const finish=value=>{if(closed)return;closed=true;seq++;dialog.close();dialog.remove();resolve(value)};
+    const finish=value=>{if(closed)return;closed=true;seq++;if(dialog.hasAttribute('open'))dialog.close();dialog.remove();resolve(value)};
     async function update(){
       const token=++seq,n=Number(input.value);selected=null;use.disabled=true;
       if(!Number.isInteger(n)||n<1||n>pdf.numPages){status.textContent=`Wybierz numer od 1 do ${pdf.numPages}.`;return}
@@ -38,13 +40,15 @@ function choosePage(pdf){
 export async function readPdfLogo(file){
   let task;
   try{
+    await prepareLogoDialogs();
     const pdfjs=await pdfLibrary();
     const root=new URL('./pdfjs/',import.meta.url).href;
-    task=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),cMapUrl:root+'cmaps/',cMapPacked:true,standardFontDataUrl:root+'standard_fonts/',wasmUrl:root+'wasm/',isEvalSupported:false});
+    task=pdfjs.getDocument({data:new Uint8Array(await readLogoBuffer(file)),cMapUrl:root+'cmaps/',cMapPacked:true,standardFontDataUrl:root+'standard_fonts/',wasmUrl:root+'wasm/',isEvalSupported:false,isOffscreenCanvasSupported:false,isImageDecoderSupported:false});
     const pdf=await task.promise;
     return pdf.numPages===1?await renderPage(pdf,1):await choosePage(pdf);
   }catch(error){
-    if(error?.name==='PasswordException')throw Error('Ten PDF jest zabezpieczony hasłem. Wgraj kopię bez hasła.');
+    if(error&&error.name==='PasswordException')throw Error('Ten PDF jest zabezpieczony hasłem. Wgraj kopię bez hasła.');
+    console.error('PDF logo import failed:',error);
     throw Error('Nie udało się otworzyć PDF. Sprawdź plik lub wybierz logo w PNG albo JPG.');
   }finally{if(task)await task.destroy()}
 }
